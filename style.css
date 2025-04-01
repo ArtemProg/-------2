@@ -219,11 +219,41 @@ body::-webkit-scrollbar {
   background: #e09e20;
 }
 
-.undo-container {
-  margin-top: 4vmin;
+.bottom-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4vmin;
+  margin-top: 5vmin;
 }
 
-#undo-button {
+.icon-button {
+  background: none;
+  border: none;
+  padding: 1vmin;
+  border-radius: 50%;
+  background-color: #fdf3dd;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  cursor: pointer;
+  width: 12vmin;
+  height: 12vmin;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.1s ease;
+}
+
+.icon-button:hover {
+  transform: scale(1.1);
+}
+
+.icon-button img {
+  width: 60%;
+  height: 60%;
+  object-fit: contain;
+}
+
+/* #undo-button {
   font-size: 4.5vmin;
   padding: 2vmin 6vmin;
   border: none;
@@ -237,4 +267,4 @@ body::-webkit-scrollbar {
 
 #undo-button:hover {
   background: #e09e20;
-}
+} */

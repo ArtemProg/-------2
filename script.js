@@ -441,6 +441,12 @@ function setupInput() {
 }
 
 document.getElementById("undo-button").addEventListener("click", undoMove);
+document.getElementById("settings-button").addEventListener("click", () => {
+  // TODO: открыть настройки
+});
+document.getElementById("shop-button").addEventListener("click", () => {
+  // TODO: открыть магазин
+});
 
 startGame(false);
 setupInput();
