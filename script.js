@@ -310,6 +310,11 @@ function saveGameState() {
     score,
     bestScore,
     currency,
+    history: historyStack.map(entry => ({
+      score: entry.score,
+      currency: entry.currency,
+      grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
+    })),
     grid: grid.map(row =>
       row.map(cell => (cell ? { value: cell.value } : null))
     )
@@ -335,6 +340,12 @@ function loadGameState() {
   bestScore = state.bestScore || 0;
   currency = state.currency || 0;
 
+  historyStack = (state.history || []).map(entry => ({
+    score: entry.score,
+    currency: entry.currency,
+    grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
+  }));
+  
   updateScoreDisplay();
   updateBestScoreDisplay();
   updateCurrencyDisplay();
