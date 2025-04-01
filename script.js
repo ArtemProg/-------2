@@ -344,6 +344,7 @@ function loadGameState() {
   const tempHistory = (state.history || []).map(entry => ({
     score: entry.score,
     currency: entry.currency,
+    bestScore: entry.bestScore,
     grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
   }));
   historyStack.length = 0;
