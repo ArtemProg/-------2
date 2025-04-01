@@ -340,12 +340,13 @@ function loadGameState() {
   bestScore = state.bestScore || 0;
   currency = state.currency || 0;
 
-  historyStack.length = 0;
-  historyStack.concat(state.history || []).map(entry => ({
+  const tempHistory = (state.history || []).map(entry => ({
     score: entry.score,
     currency: entry.currency,
     grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
   }));
+  historyStack.length = 0;
+  historyStack.push(...tempHistory);
 
   updateScoreDisplay();
   updateBestScoreDisplay();
@@ -387,7 +388,7 @@ function startGame(isNewGame = true) {
     isPlaying = true;
     return;
   }
-  
+
   updateScoreDisplay();
 
   loadBestScore();
