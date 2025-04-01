@@ -194,18 +194,18 @@ body::-webkit-scrollbar {
 }
 
 .overlay-content h1 {
-  font-size: 6vmin;
+  font-size: 12svmin;
   margin-bottom: 1vmin;
 }
 
 .overlay-content p {
-  font-size: 3.5vmin;
+  font-size: 6vmin;
   margin-bottom: 3vmin;
 }
 
 .overlay-content button {
-  font-size: 3.5vmin;
-  padding: 1vmin 3vmin;
+  font-size: 6vmin;
+  padding: 3vmin 6vmin;
   border: none;
   border-radius: 8px;
   background: #f6b73c;
