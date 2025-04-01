@@ -1,0 +1,28 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>2048 с котиками</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="top-panel">
+    <div class="currency"><img src="images/icon_coin.png" alt="монеты" /><span id="currency">0</span></div>
+    <div class="score-large"><span id="score">0</span></div>
+    <div class="best"><img src="images/icon_crown.png" alt="лучший" /><span id="best">0</span></div>
+  </div>
+  <div class="game-container">
+    <div class="grid-container" id="grid"></div>
+  </div>
+  <div class="overlay hidden" id="overlay">
+    <div class="overlay-content">
+      <h1 id="overlay-title">Ты победил!</h1>
+      <p id="overlay-subtitle">Ты достиг уровня 4!</p>
+      <button id="restart-button">ИГРАТЬ СНОВА</button>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
