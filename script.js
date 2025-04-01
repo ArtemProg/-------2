@@ -458,19 +458,54 @@ let destroyMode = false;
 const destroyPanel = document.getElementById("destroy-mode-panel");
 
 function handleDestroyClick(e) {
-
+  
   let isDestroyMode = destroyMode;
   exitDestroyMode();
 
   if (!isDestroyMode) return;
 
   const tile = e.target.closest(".tile");
-  if (tile) {
-    // позже реализуем удаление
-    console.log("Плитка выбрана для уничтожения:", tile);
-    // Здесь ничего не делаем пока
+  if (!tile) return;
+
+  // Поиск координат плитки
+  let r = -1, c = -1;
+  for (let row = 0; row < gridSize; row++) {
+    for (let col = 0; col < gridSize; col++) {
+      if (grid[row][col]?.el === tile) {
+        r = row;
+        c = col;
+        break;
+      }
+    }
+    if (r !== -1) break;
   }
+
+  if (r === -1 || c === -1) return;
+
+  // Получаем реальные координаты плитки
+  const rect = tile.getBoundingClientRect();
+  const parentRect = gridElement.getBoundingClientRect();
+  const x = rect.left - parentRect.left;
+  const y = rect.top - parentRect.top;
+
+  const tileCopy = tile.cloneNode(true);
+  tileCopy.classList.add("tile-destroying");
+  tileCopy.style.position = "absolute";
+  tileCopy.style.left = `${x}px`;
+  tileCopy.style.top = `${y}px`;
+  tileCopy.style.width = `${rect.width}px`;
+  tileCopy.style.height = `${rect.height}px`;
+
+  gridElement.appendChild(tileCopy);
+  gridElement.removeChild(tile);
+  grid[r][c] = null;
+
+  setTimeout(() => {
+    tileCopy.remove();
+    saveGameState();
+  }, 400);
 }
+
 
 function enterDestroyMode() {
   destroyMode = true;
