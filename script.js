@@ -317,6 +317,9 @@ function startGame(isNewGame = true) {
     return;
   }
 
+  score = 0;
+  updateScoreDisplay();
+  
   loadBestScore();
   createGrid();
   spawnTile();
@@ -364,5 +367,5 @@ function setupInput() {
   }, { passive: false });
 }
 
-startGame();
+startGame(false);
 setupInput();
