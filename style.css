@@ -219,4 +219,22 @@ body::-webkit-scrollbar {
   background: #e09e20;
 }
 
+.undo-container {
+  margin-top: 4vmin;
+}
 
+#undo-button {
+  font-size: 4.5vmin;
+  padding: 2vmin 6vmin;
+  border: none;
+  border-radius: 8px;
+  background: #f6b73c;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+#undo-button:hover {
+  background: #e09e20;
+}

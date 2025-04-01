@@ -19,6 +19,9 @@ const Storage = {
   }
 };
 
+const historyStack = [];
+const HISTORY_LIMIT = 10;
+
 let bestScore = Storage.load("bestScore", 0);
 let currency = Storage.load("currency", 0);
 
@@ -31,6 +34,56 @@ const cellSize = tileSize + gap;
 const gridElement = document.getElementById("grid");
 let grid = [];
 let score = 0;
+
+function pushToHistory() {
+  const snapshot = {
+    score,
+    bestScore,
+    currency,
+    grid: grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
+  };
+  historyStack.push(snapshot);
+  if (historyStack.length > HISTORY_LIMIT) {
+    historyStack.shift();
+  }
+}
+
+function undoMove() {
+  const prev = historyStack.pop();
+  if (!prev) return;
+
+  score = prev.score;
+  bestScore = prev.bestScore;
+  currency = prev.currency;
+
+  updateScoreDisplay();
+  updateBestScoreDisplay();
+  updateCurrencyDisplay();
+
+  gridElement.innerHTML = "";
+  grid = [];
+  createGrid();
+
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      const cell = prev.grid[r][c];
+      if (cell) {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.innerHTML = `
+          <div class="tile-inner">
+            <div class="tile-sprite"></div>
+            <div class="tile-level"><span>${Math.log2(cell.value)}</span></div>
+          </div>`;
+        grid[r][c] = { el: tile, value: cell.value };
+        setTilePosition(tile, r, c);
+        styleTile(tile, cell.value);
+        setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
+        gridElement.appendChild(tile);
+      }
+    }
+  }
+}
 
 function createGrid() {
   for (let r = 0; r < gridSize; r++) {
@@ -118,6 +171,9 @@ function setTileSprite(spriteElement, value) {
 
 function move(direction) {
   if (!isPlaying) return;
+
+  pushToHistory();
+
   let moved = false;
   const dir = {
     ArrowUp: { x: 0, y: -1 },
@@ -319,7 +375,7 @@ function startGame(isNewGame = true) {
 
   score = 0;
   updateScoreDisplay();
-  
+
   loadBestScore();
   createGrid();
   spawnTile();
@@ -366,6 +422,8 @@ function setupInput() {
     }
   }, { passive: false });
 }
+
+document.getElementById("undo-button").addEventListener("click", undoMove);
 
 startGame(false);
 setupInput();
