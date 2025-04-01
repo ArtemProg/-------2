@@ -35,13 +35,16 @@ const gridElement = document.getElementById("grid");
 let grid = [];
 let score = 0;
 
-function pushToHistory() {
-  const snapshot = {
+function getSnapshot() {
+  return {
     score,
     bestScore,
     currency,
     grid: grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
   };
+}
+
+function pushToHistory(snapshot = null || getSnapshot()) {
   historyStack.push(snapshot);
   if (historyStack.length > HISTORY_LIMIT) {
     historyStack.shift();
@@ -49,6 +52,8 @@ function pushToHistory() {
 }
 
 function undoMove() {
+  if (destroyMode) return;
+
   const prev = historyStack.pop();
   if (!prev) return;
 
@@ -172,7 +177,7 @@ function setTileSprite(spriteElement, value) {
 function move(direction) {
   if (!isPlaying) return;
 
-  pushToHistory();
+  let snapshot = getSnapshot();
 
   let moved = false;
   const dir = {
@@ -237,6 +242,7 @@ function move(direction) {
       spawnTile();
       checkGameOver();
       saveGameState();
+      pushToHistory(snapshot);
     }, 150);
   }
 }
@@ -414,7 +420,7 @@ document.getElementById("restart-button").addEventListener("click", restartGame)
 
 function setupInput() {
   window.addEventListener("keydown", (e) => {
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    if (!destroyMode && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
       move(e.key);
     }
@@ -432,21 +438,54 @@ function setupInput() {
     const t = e.changedTouches[0];
     const dx = t.clientX - touchStartX;
     const dy = t.clientY - touchStartY;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipeDistance) {
-      move(dx > 0 ? "ArrowRight" : "ArrowLeft");
-    } else if (Math.abs(dy) > minSwipeDistance) {
-      move(dy > 0 ? "ArrowDown" : "ArrowUp");
+    if (!destroyMode) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipeDistance) {
+        move(dx > 0 ? "ArrowRight" : "ArrowLeft");
+      } else if (Math.abs(dy) > minSwipeDistance) {
+        move(dy > 0 ? "ArrowDown" : "ArrowUp");
+      }
     }
   }, { passive: false });
 }
 
 document.getElementById("undo-button").addEventListener("click", undoMove);
-document.getElementById("settings-button").addEventListener("click", () => {
-  // TODO: открыть настройки
-});
+document.getElementById("destroy-button").addEventListener("click", enterDestroyMode);
 document.getElementById("shop-button").addEventListener("click", () => {
   // TODO: открыть магазин
 });
+
+let destroyMode = false;
+const destroyPanel = document.getElementById("destroy-mode-panel");
+
+function handleDestroyClick(e) {
+
+  let isDestroyMode = destroyMode;
+  exitDestroyMode();
+
+  if (!isDestroyMode) return;
+
+  const tile = e.target.closest(".tile");
+  if (tile) {
+    // позже реализуем удаление
+    console.log("Плитка выбрана для уничтожения:", tile);
+    // Здесь ничего не делаем пока
+  }
+}
+
+function enterDestroyMode() {
+  destroyMode = true;
+  destroyPanel.classList.remove("hidden");
+
+  setTimeout(() => {
+    document.addEventListener("click", handleDestroyClick);
+  }, 50);
+}
+
+function exitDestroyMode() {
+  destroyMode = false;
+  destroyPanel.classList.add("hidden");
+  document.removeEventListener("click", handleDestroyClick);
+}
 
 startGame(false);
 setupInput();
