@@ -261,6 +261,16 @@ function saveGameState() {
   Storage.save("gameState", state);
 }
 
+function loadBestScore() {
+  const state = Storage.load("gameState", null);
+
+  bestScore = state?.bestScore || 0;
+  currency = state?.currency || 0;
+
+  updateBestScoreDisplay();
+  updateCurrencyDisplay();
+}
+
 function loadGameState() {
   const state = Storage.load("gameState", null);
   if (!state || !state.grid) return false;
@@ -300,13 +310,14 @@ function loadGameState() {
   return true;
 }
 
-function startGame() {
-  if (loadGameState()) {
+function startGame(isNewGame = true) {
+
+  if (!isNewGame && loadGameState()) {
     isPlaying = true;
     return;
   }
-  updateCurrencyDisplay();
-  updateBestScoreDisplay();
+
+  loadBestScore();
   createGrid();
   spawnTile();
   spawnTile();
