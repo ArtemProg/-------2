@@ -1,3 +1,26 @@
+// ===== ХРАНИЛИЩЕ ДАННЫХ =====
+const Storage = {
+  save(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  },
+  load(key, fallback = null) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  async saveRemote(key, value) {
+    // TODO: API-провайдер (например, YaGames.data.set)
+  },
+  async loadRemote(key, fallback = null) {
+    return fallback;
+  }
+};
+
+let bestScore = Storage.load("bestScore", 0);
+let currency = Storage.load("currency", 0);
 
 let isPlaying = false;
 const gridSize = 4;
@@ -143,8 +166,7 @@ function move(direction) {
               </div>`;
             styleTile(toTile, newValue);
             setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
-            score += newValue;
-            document.getElementById("score").textContent = score;
+            addScore(newValue);
             checkWin(newValue);
           }, 150);
         } else {
@@ -158,8 +180,40 @@ function move(direction) {
     setTimeout(() => {
       spawnTile();
       checkGameOver();
+      saveGameState();
     }, 150);
   }
+}
+
+function updateBestScoreDisplay() {
+  const el = document.getElementById("best");
+  if (el) el.textContent = bestScore;
+}
+
+function updateCurrencyDisplay() {
+  const el = document.getElementById("currency");
+  if (el) el.textContent = currency;
+}
+
+function updateScoreDisplay() {
+  const el = document.getElementById("score");
+  if (el) el.textContent = score;
+}
+
+function addScore(points) {
+  score += points;
+  updateScoreDisplay();
+  if (score > bestScore) {
+    bestScore = score;
+    Storage.save("bestScore", bestScore);
+    updateBestScoreDisplay();
+  }
+}
+
+function addCurrency(amount) {
+  currency += amount;
+  Storage.save("currency", currency);
+  updateCurrencyDisplay();
 }
 
 function checkWin(value) {
@@ -195,7 +249,64 @@ function showOverlay(title, subtitle) {
   overlay.classList.remove("hidden");
 }
 
+function saveGameState() {
+  const state = {
+    score,
+    bestScore,
+    currency,
+    grid: grid.map(row =>
+      row.map(cell => (cell ? { value: cell.value } : null))
+    )
+  };
+  Storage.save("gameState", state);
+}
+
+function loadGameState() {
+  const state = Storage.load("gameState", null);
+  if (!state || !state.grid) return false;
+
+  score = state.score || 0;
+  bestScore = state.bestScore || 0;
+  currency = state.currency || 0;
+
+  updateScoreDisplay();
+  updateBestScoreDisplay();
+  updateCurrencyDisplay();
+
+  gridElement.innerHTML = "";
+  grid = [];
+  createGrid();
+
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      const cell = state.grid[r][c];
+      if (cell) {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.innerHTML = `
+          <div class="tile-inner">
+            <div class="tile-sprite"></div>
+            <div class="tile-level"><span>\${Math.log2(cell.value)}</span></div>
+          </div>`;
+        grid[r][c] = { el: tile, value: cell.value };
+        setTilePosition(tile, r, c);
+        styleTile(tile, cell.value);
+        setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
+        gridElement.appendChild(tile);
+      }
+    }
+  }
+
+  return true;
+}
+
 function startGame() {
+  if (loadGameState()) {
+    isPlaying = true;
+    return;
+  }
+  updateCurrencyDisplay();
+  updateBestScoreDisplay();
   createGrid();
   spawnTile();
   spawnTile();
@@ -208,7 +319,7 @@ function restartGame() {
   gridElement.innerHTML = "";
   grid = [];
   score = 0;
-  document.getElementById("score").textContent = score;
+  updateScoreDisplay();
   startGame();
 }
 
