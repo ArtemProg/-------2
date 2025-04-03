@@ -465,6 +465,7 @@ function handleDestroyClick(e) {
   if (!isDestroyMode) return;
 
   const tile = e.target.closest(".tile");
+
   if (!tile) return;
 
   // Поиск координат плитки
@@ -482,28 +483,69 @@ function handleDestroyClick(e) {
 
   if (r === -1 || c === -1) return;
 
-  // Получаем реальные координаты плитки
+  // Получаем координаты с учётом transform
+  const originalTransform = tile.style.transform;
+  tile.style.transform = "none";
   const rect = tile.getBoundingClientRect();
+  tile.style.transform = originalTransform;
+
   const parentRect = gridElement.getBoundingClientRect();
   const x = rect.left - parentRect.left;
   const y = rect.top - parentRect.top;
 
-  const tileCopy = tile.cloneNode(true);
-  tileCopy.classList.add("tile-destroying");
-  tileCopy.style.position = "absolute";
-  tileCopy.style.left = `${x}px`;
-  tileCopy.style.top = `${y}px`;
-  tileCopy.style.width = `${rect.width}px`;
-  tileCopy.style.height = `${rect.height}px`;
+  // позиционируем в центре плитки
+  const tileRect = tile.getBoundingClientRect();
+  const centerX = tileRect.top + tileRect.width / 2;
+  const centerY = tileRect.left + tileRect.height / 2;
 
-  gridElement.appendChild(tileCopy);
-  gridElement.removeChild(tile);
-  grid[r][c] = null;
+  // Частицы
+  for (let i = 0; i < 15; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    document.body.appendChild(p);
+    
+    p.style.top = centerX + 'px';
+    p.style.left = centerY + 'px';
 
-  setTimeout(() => {
-    tileCopy.remove();
-    saveGameState();
-  }, 400);
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 40 + Math.random() * 40;
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance;
+
+    gsap.to(p, {
+      x: dx,
+      y: dy,
+      opacity: 0,
+      scale: 0.5 + Math.random(),
+      duration: 0.6,
+      ease: "power2.out",
+      onComplete: () => p.remove()
+    });
+  }
+  
+  // Вспышка
+  gsap.fromTo(tile,
+    { opacity: 0, scale: 0.5 },
+    { opacity: 1, scale: 1.2, duration: 0.1, ease: "power2.out",
+      onComplete: () => {
+        gsap.to(tile, {
+          opacity: 0,
+          scale: 1.1,
+          duration: 0.3,
+          ease: "power3.in"
+        });
+      }
+    }
+  );
+
+  // Тряска
+  gsap.fromTo(tile, 
+    { x: x - 30 }, 
+    { x: x + 30, yoyo: true, repeat: 5, duration: 0.03, ease: "power1.inOut", onComplete: () => {
+      gsap.to(tile, { x: x, duration: 0.05 });
+    }}
+  );
+
 }
 
 
@@ -520,6 +562,18 @@ function exitDestroyMode() {
   destroyMode = false;
   destroyPanel.classList.add("hidden");
   document.removeEventListener("click", handleDestroyClick);
+}
+
+
+function destroyTile(tileElement, r, c) {
+  tileElement.classList.add("destroying");
+
+  setTimeout(() => {
+    gridElement.removeChild(tileElement);
+    grid[r][c] = null;
+    exitDestroyMode();
+    saveGameState();
+  }, 700); // учитываем общее время анимации (0.25s + 0.4s)
 }
 
 startGame(false);

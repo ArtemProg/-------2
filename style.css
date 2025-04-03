@@ -316,3 +316,46 @@ body::-webkit-scrollbar {
     opacity: 0;
   }
 }
+
+
+.tile.destroying {
+  animation: shake 0.25s ease-in-out, explode 1s ease-in-out 0.25s forwards;
+  /* animation: shake 0.5s ease-out forwards; */
+  z-index: 20;
+}
+
+@keyframes shake {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+  10%  { transform: translate(-2px, 1px) scale(1.05) rotate(2deg); }
+  20%  { transform: translate(2px, -2px) scale(1.05) rotate(-2deg); }
+  30%  { transform: translate(-2px, 2px) rotate(2deg); }
+  40%  { transform: translate(2px, -1px) rotate(-2deg); }
+  50%  { transform: translate(-1px, 2px) rotate(1deg); }
+  60%  { transform: translate(1px, -1px) rotate(-1deg); }
+  70%  { transform: translate(0, 0) rotate(0deg); }
+  85%  { transform: scale(1.2) rotate(10deg); opacity: 0.8; }
+  100% { transform: scale(0) rotate(90deg); opacity: 0; }
+}
+
+@keyframes explode {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2);
+    filter: brightness(3);
+  }
+}
+
+.particle {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  background: white;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1000;
+}
