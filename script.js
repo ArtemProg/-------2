@@ -19,6 +19,42 @@ const Storage = {
   }
 };
 
+const colorCache = {};
+const log2Cache = {};
+
+const predefinedTileColors = {
+  1: ['#eee4da', '#776e65'],     // 2
+  2: ['#ede0c8', '#776e65'],     // 4
+  3: ['#f2b179', '#f9f6f2'],     // 8
+  4: ['#f59563', '#f9f6f2'],     // 16
+  5: ['#f67c5f', '#f9f6f2'],     // 32
+  6: ['#f65e3b', '#f9f6f2'],     // 64
+  7: ['#edcf72', '#f9f6f2'],     // 128
+  8: ['#edcc61', '#f9f6f2'],     // 256
+  9: ['#edc850', '#f9f6f2'],     // 512
+ 10: ['#edc53f', '#f9f6f2'],     // 1024
+ 11: ['#edc22e', '#f9f6f2'],     // 2048
+ 12: ['#d4af37', '#f9f6f2'],     // 4096
+ 13: ['#b8860b', '#f9f6f2'],     // 8192
+ 14: ['#a97142', '#f9f6f2'],     // 16384
+ 15: ['#8b4513', '#f9f6f2'],     // 32768
+};
+
+
+const randomLevelUpPhrases = [
+  "Кот доволен твоим прогрессом!",
+  "Ты приближаешься к хвостатой легенде!",
+  "Мяу! Ты просто чудо!",
+  "Кажется, у этого кота девять жизней — и все в прокачке!",
+  "Котик лайкнул твой уровень!",
+  "Ты кото-богат!",
+  "Шаг за шагом — к усатой вершине!",
+  "Вот это кот-комбо!",
+  "У тебя лапы растут откуда надо!",
+  "Ты точно знаешь, как обращаться с пушистыми цифрами!"
+];
+let highestLevelReached = 3; // уровень до 4 не показываем
+
 const historyStack = [];
 const HISTORY_LIMIT = 10;
 
@@ -78,7 +114,7 @@ function undoMove() {
         tile.innerHTML = `
           <div class="tile-inner">
             <div class="tile-sprite"></div>
-            <div class="tile-level"><span>${Math.log2(cell.value)}</span></div>
+            <div class="tile-level"><span>${getLevel(cell.value)}</span></div>
           </div>`;
         grid[r][c] = { el: tile, value: cell.value };
         setTilePosition(tile, r, c);
@@ -117,7 +153,7 @@ function spawnTile() {
   tile.innerHTML = `
     <div class="tile-inner pop">
       <div class="tile-sprite"></div>
-      <div class="tile-level"><span>${Math.log2(value)}</span></div>
+      <div class="tile-level"><span>${getLevel(value)}</span></div>
     </div>`;
   grid[r][c] = { el: tile, value };
   setTilePosition(tile, r, c);
@@ -134,27 +170,17 @@ function setTilePosition(tile, r, c) {
 }
 
 function styleTile(tile, value) {
-  const colors = {
-    2: ['#eee4da', '#776e65'],
-    4: ['#ede0c8', '#776e65'],
-    8: ['#f2b179', '#f9f6f2'],
-    16: ['#f59563', '#f9f6f2'],
-    32: ['#f67c5f', '#f9f6f2'],
-    64: ['#f65e3b', '#f9f6f2'],
-    128: ['#edcf72', '#f9f6f2'],
-    256: ['#edcc61', '#f9f6f2'],
-    512: ['#edc850', '#f9f6f2'],
-    1024: ['#edc53f', '#f9f6f2'],
-    2048: ['#edc22e', '#f9f6f2'],
-    4096: ['#d4af37', '#f9f6f2'],
-    8192: ['#b8860b', '#f9f6f2'],
-    16384: ['#a97142', '#f9f6f2'],
-    32768: ['#8b4513', '#f9f6f2'],
-  };
-  const [bg, color] = colors[value] || ['#3c3a32', '#f9f6f2'];
+  
+  const level = getLevel(value);
+
+  const [bg, color] = getColorForLevel(level);
+
   tile.style.background = bg;
   tile.style.color = color;
-  const level = Math.log2(value);
+
+  tile.style.background = bg;
+  tile.style.color = color;
+  
   const levelElem = tile.querySelector(".tile-level span");
   if (levelElem) levelElem.textContent = level;
 
@@ -167,8 +193,32 @@ function styleTile(tile, value) {
   }
 }
 
-function setTileSprite(spriteElement, value) {
+function getColorForLevel(level) {
+  if (colorCache[level]) return colorCache[level];
+
+  let colors;
+
+  if (predefinedTileColors[level]) {
+    colors = predefinedTileColors[level];
+  } else {
+    const hue = (level * 35) % 360; // циклично по кругу
+    colors = [`hsl(${hue}, 70%, 60%)`, '#f9f6f2'];
+  }
+
+  colorCache[level] = colors;
+
+  return colors;
+}
+
+function getLevel(value) {
+  if (log2Cache[value]) return log2Cache[value];
   const level = Math.log2(value);
+  log2Cache[value] = level;
+  return level;
+}
+
+function setTileSprite(spriteElement, value) {
+  const level = getLevel(value);
   const maxLevel = 15;
   const clamped = Math.min(level, maxLevel);
   spriteElement.style.backgroundImage = `url('./images/img_${clamped}.png')`;
@@ -223,7 +273,7 @@ function move(direction) {
             toTile.innerHTML = `
               <div class="tile-inner pop">
                 <div class="tile-sprite"></div>
-                <div class="tile-level"><span>${Math.log2(newValue)}</span></div>
+                <div class="tile-level"><span>${getLevel(newValue)}</span></div>
               </div>`;
             styleTile(toTile, newValue);
             setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
@@ -279,8 +329,13 @@ function addCurrency(amount) {
 }
 
 function checkWin(value) {
-  if (Math.log2(value) === 4) {
-    showOverlay("Ты победил!", "Ты достиг уровня 4!");
+  // if (getLevel(value) === 9) {
+  //   showOverlay("Ты победил!", "Ты достиг уровня 4!");
+  // }
+  const level = getLevel(value);
+  if (level >= 4 && level > highestLevelReached) {
+    highestLevelReached = level;
+    showLevelUpPopup(level);
   }
 }
 
@@ -373,7 +428,7 @@ function loadGameState() {
         tile.innerHTML = `
           <div class="tile-inner">
             <div class="tile-sprite"></div>
-            <div class="tile-level"><span>\${Math.log2(cell.value)}</span></div>
+            <div class="tile-level"><span>${getLevel(cell.value)}</span></div>
           </div>`;
         grid[r][c] = { el: tile, value: cell.value };
         setTilePosition(tile, r, c);
@@ -450,12 +505,212 @@ function setupInput() {
 
 document.getElementById("undo-button").addEventListener("click", undoMove);
 document.getElementById("destroy-button").addEventListener("click", enterDestroyMode);
-document.getElementById("shop-button").addEventListener("click", () => {
-  // TODO: открыть магазин
-});
+document.getElementById("swap-button").addEventListener("click", enterSwapMode);
+
 
 let destroyMode = false;
 const destroyPanel = document.getElementById("destroy-mode-panel");
+
+let swapMode = false;
+let selectedTiles = [];
+const swapPanel = document.getElementById("swap-mode-panel");
+
+function enterSwapMode() {
+
+  if (swapMode) {
+    // Если режим уже активен — сбрасываем всё
+    exitSwapMode();
+    return;
+  }
+
+  swapMode = true;
+  selectedTiles = [];
+  swapPanel.classList.remove("hidden");
+
+  setTimeout(() => {
+    document.addEventListener("click", handleSwapClick);
+  }, 50);
+}
+
+function exitSwapMode() {
+  swapMode = false;
+  swapPanel.classList.add("hidden");
+  document.removeEventListener("click", handleSwapClick);
+
+  // Убираем подсветку
+  selectedTiles.forEach(tile => tile.classList.remove("selected"));
+  selectedTiles = [];
+}
+
+function handleSwapClick(e) {
+  const tile = e.target.closest(".tile");
+  if (!tile) {
+    exitSwapMode();
+    return;
+  }
+
+  // Определяем координаты плитки
+  let r = -1, c = -1;
+  for (let row = 0; row < gridSize; row++) {
+    for (let col = 0; col < gridSize; col++) {
+      if (grid[row][col]?.el === tile) {
+        r = row;
+        c = col;
+        break;
+      }
+    }
+    if (r !== -1) break;
+  }
+
+  if (r === -1 || c === -1) return;
+
+  // Проверка: уже выбрана эта же плитка?
+  if (selectedTiles.some(t => t.r === r && t.c === c)) return;
+
+  selectedTiles.push({ r, c });
+  tile.classList.add("selected");
+
+  if (selectedTiles.length === 2) {
+    const [first, second] = selectedTiles;
+    const tileA = grid[first.r][first.c];
+    const tileB = grid[second.r][second.c];
+
+    if (!tileA || !tileB) return;
+
+    const elA = tileA.el;
+    const elB = tileB.el;
+
+    const posA = { x: first.c * cellSize + gap, y: first.r * cellSize + gap };
+    const posB = { x: second.c * cellSize + gap, y: second.r * cellSize + gap };
+
+    gsap.to(elA, {
+      x: posB.x + 'vmin',
+      y: posB.y + 'vmin',
+      duration: 0.3,
+      onComplete: () => setTilePosition(elA, second.r, second.c)
+    });
+
+    gsap.to(elB, {
+      x: posA.x + 'vmin',
+      y: posA.y + 'vmin',
+      duration: 0.3,
+      onComplete: () => setTilePosition(elB, first.r, first.c)
+    });
+
+    // Обновляем grid
+    [grid[first.r][first.c], grid[second.r][second.c]] = [tileB, tileA];
+
+    elA.classList.remove("selected");
+    elB.classList.remove("selected");
+
+    selectedTiles = [];
+    exitSwapMode();
+    saveGameState();
+  }
+}
+
+
+function handleSwapClick1(e) {
+  const tile = e.target.closest(".tile");
+  if (!tile) {
+    exitSwapMode();
+    return;
+  }
+
+  if (selectedTiles.includes(tile)) return;
+
+  let r = -1, c = -1;
+  for (let row = 0; row < gridSize; row++) {
+    for (let col = 0; col < gridSize; col++) {
+      if (grid[row][col]?.el === tile) {
+        r = row;
+        c = col;
+        break;
+      }
+    }
+    if (r !== -1) break;
+  }
+
+  if (r === -1 || c === -1) return;
+
+  selectedTiles.push(tile);
+
+  // Подсветим выбранную плитку
+  tile.classList.add("selected");
+
+  if (selectedTiles.length === 2) {
+    
+    const [tile1, tile2] = selectedTiles;
+    const pos1 = findTilePosition(tile1);
+    const pos2 = findTilePosition(tile2);
+
+    if (!pos1 || !pos2) {
+      exitSwapMode();
+      return;
+    }
+
+    // Анимация перелёта
+    const [r1, c1] = pos1;
+    const [r2, c2] = pos2;
+    const cell1 = grid[r1][c1];
+    const cell2 = grid[r2][c2];
+
+    // Обмен DOM-плитками
+    grid[r1][c1] = cell2;
+    grid[r2][c2] = cell1;
+
+    setTilePosition(cell1.el, r2, c2);
+    setTilePosition(cell2.el, r1, c1);
+
+    // Снять выделение и завершить режим
+    selectedTiles.forEach(t => t.classList.remove("selected"));
+    selectedTiles = [];
+
+    saveGameState();
+    exitSwapMode();
+
+    return
+    
+    // Меняем местами элементы в DOM
+    const tempPosA = { x: first.c * cellSize + gap, y: first.r * cellSize + gap };
+    const tempPosB = { x: second.c * cellSize + gap, y: second.r * cellSize + gap };
+
+    gsap.to(tileA, {
+      x: tempPosB.x + 'vmin',
+      y: tempPosB.y + 'vmin',
+      duration: 0.3,
+      onComplete: () => setTilePosition(tileA, second.r, second.c)
+    });
+
+    gsap.to(tileB, {
+      x: tempPosA.x + 'vmin',
+      y: tempPosA.y + 'vmin',
+      duration: 0.3,
+      onComplete: () => setTilePosition(tileB, first.r, first.c)
+    });
+
+    // Меняем данные в grid
+    [grid[first.r][first.c], grid[second.r][second.c]] = [tileB, tileA];
+
+    // Убираем подсветку
+    tileA.classList.remove("selected");
+    tileB.classList.remove("selected");
+
+    exitSwapMode();
+    saveGameState();
+  }
+}
+
+function findTilePosition(tileEl) {
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      if (grid[r][c]?.el === tileEl) {
+        return { r: r, c: c };
+      }
+    }
+  }
+  return null;
+}
 
 function handleDestroyClick(e) {
   
@@ -532,7 +787,10 @@ function handleDestroyClick(e) {
           opacity: 0,
           scale: 1.1,
           duration: 0.3,
-          ease: "power3.in"
+          ease: "power3.in",
+          onComplete: () => {
+            destroyTile(tile, r, c);
+          }
         });
       }
     }
@@ -547,7 +805,6 @@ function handleDestroyClick(e) {
   );
 
 }
-
 
 function enterDestroyMode() {
   destroyMode = true;
@@ -564,16 +821,48 @@ function exitDestroyMode() {
   document.removeEventListener("click", handleDestroyClick);
 }
 
-
 function destroyTile(tileElement, r, c) {
-  tileElement.classList.add("destroying");
+  gridElement.removeChild(tileElement);
+  grid[r][c] = null;
+  saveGameState();
+}
 
-  setTimeout(() => {
-    gridElement.removeChild(tileElement);
-    grid[r][c] = null;
-    exitDestroyMode();
-    saveGameState();
-  }, 700); // учитываем общее время анимации (0.25s + 0.4s)
+
+function getRandomLevelUpPhrase() {
+  return randomLevelUpPhrases[Math.floor(Math.random() * randomLevelUpPhrases.length)];
+}
+
+function showLevelUpPopup(level) {
+  const popup = document.getElementById("level-up-popup");
+  const img = document.getElementById("level-up-img");
+  const text = document.getElementById("level-up-text");
+
+  img.src = `images/img_${level}.png`;
+  text.textContent = getRandomLevelUpPhrase();
+
+  popup.classList.remove("hidden");
+  isPlaying = false;
+
+  gsap.fromTo(popup,
+    { scale: 0.5, opacity: 0 },
+    {
+      scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.7)",
+      onComplete: () => {
+        setTimeout(() => {
+          gsap.to(popup, {
+            scale: 0.5,
+            opacity: 0,
+            duration: 0.3,
+            ease: "back.in(1.7)",
+            onComplete: () => {
+              popup.classList.add("hidden");
+              isPlaying = true;
+            }
+          });
+        }, 2000);
+      }
+    }
+  );
 }
 
 startGame(false);
