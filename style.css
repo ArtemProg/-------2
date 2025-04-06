@@ -32,9 +32,9 @@ html, body {
 }
 
 #game-wrapper {
-  width: min(100vw, calc(100vh * 5 / 7));
+  width: min(100vw, calc(100vh * 5 / 8));
   height: 100%;
-  aspect-ratio: 5 / 7;
+  aspect-ratio: 5 / 8;
   background: #48cae4;
   background: linear-gradient(135deg, #468faf, #89c2d9);
   overflow: hidden;

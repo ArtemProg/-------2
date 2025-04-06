@@ -23,7 +23,7 @@
         <img src="images/icon_ad.png"  />
         <div class="reward-label">
           <img src="images/diamond.png" />
-          <span>+150</span>
+          <span>+115</span>
         </div>
       </button>
       <button id="undo-button" class="icon-button" title="Отменить ход">
@@ -92,7 +92,10 @@
       </div>
     </div>
   </div>
-  <audio id="bg-music" src="sound/music.mp3" preload="auto" loop></audio>
+  <audio id="bg-music" preload="auto" loop>
+    <source src="sound/music.m4a" type="audio/mp4">
+    <source src="sound/music.mp3" type="audio/mpeg">
+  </audio>
   <script src="script.js"></script>
 </body>
 </html>

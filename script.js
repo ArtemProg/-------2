@@ -98,8 +98,8 @@ let score = 0;
 function getSnapshot() {
   return {
     score,
-    bestScore,
-    currency,
+    // bestScore,
+    // currency,
     grid: grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
   };
 }
@@ -112,18 +112,27 @@ function pushToHistory(snapshot = null || getSnapshot()) {
 }
 
 function undoMove() {
-  if (destroyMode) return;
+  if (destroyMode || swapMode) return;
+
+  if (currency < 110) {
+    alert("Недостаточно монет!");
+    return;
+  }
 
   const prev = historyStack.pop();
   if (!prev) return;
 
+  currency -= 110;
+  Storage.save("currency", currency);
+  updateCurrencyDisplay();
+
   score = prev.score;
-  bestScore = prev.bestScore;
-  currency = prev.currency;
+  // bestScore = prev.bestScore;
+  // currency = prev.currency;
 
   updateScoreDisplay();
-  updateBestScoreDisplay();
-  updateCurrencyDisplay();
+  // updateBestScoreDisplay();
+  // updateCurrencyDisplay();
 
   gridElement.innerHTML = "";
   grid = [];
@@ -470,6 +479,12 @@ function loadGameState() {
 
 function startGame(isNewGame = true) {
 
+  if (!Storage.load("hasEnteredBefore", false)) {
+    currency += 400;
+    Storage.save("currency", currency);
+    Storage.save("hasEnteredBefore", true);
+  }
+
   historyStack.length = 0;
   score = 0;
 
@@ -532,6 +547,7 @@ function setupInput() {
 document.getElementById("undo-button").addEventListener("click", undoMove);
 document.getElementById("destroy-button").addEventListener("click", enterDestroyMode);
 document.getElementById("swap-button").addEventListener("click", enterSwapMode);
+document.getElementById("ad-button").addEventListener("click", showAdsVideo);
 
 document.getElementById("settings-button").addEventListener("click", () => {
   isPaused = true;
@@ -604,6 +620,11 @@ function enterSwapMode() {
     exitSwapMode();
     return;
   }
+  
+  if (currency < 120) {
+    alert("Недостаточно монет!");
+    return;
+  }
 
   swapMode = true;
   selectedTiles = [];
@@ -656,6 +677,10 @@ function handleSwapClick(e) {
   tile.classList.add("selected");
 
   if (selectedTiles.length === 2) {
+
+    currency -= 120;
+    Storage.save("currency", currency);
+    updateCurrencyDisplay();
 
     pushToHistory();
 
@@ -748,6 +773,10 @@ function handleDestroyClick(e) {
     return;
   }
 
+  currency -= 100;
+  Storage.save("currency", currency);
+  updateCurrencyDisplay();
+
   pushToHistory();
 
   // Получаем координаты с учётом transform
@@ -819,6 +848,12 @@ function handleDestroyClick(e) {
 }
 
 function enterDestroyMode() {
+
+  if (currency < 100) {
+    alert("Недостаточно монет!");
+    return;
+  }
+
   destroyMode = true;
   updateHelperPanel("destroy-mode-panel");
   destroyPanel.classList.remove("hidden");
@@ -948,10 +983,15 @@ bgMusic.addEventListener('canplaythrough', () => {
   musicReady = true;
 });
 
+function showAdsVideo() {
+  currency += 115;
+  Storage.save("currency", currency);
+  updateCurrencyDisplay();
+}
 
 function tryStartMusic() {
   if (musicReady && !musicStarted && isSoundOn) {
-    bgMusic.volume = 0.3;
+    bgMusic.volume = 0.2;
     bgMusic.loop = true;
 
     bgMusic.play().then(() => {
@@ -968,10 +1008,13 @@ function tryStartMusic() {
   }
 }
 
+
+
+startGame(false);
+setupInput();
+
 // Навешиваем на первое взаимодействие
 document.addEventListener("click", tryStartMusic);
 window.addEventListener("touchstart", tryStartMusic);
 window.addEventListener("keydown", tryStartMusic);
-
-startGame(false);
-setupInput();
+document.body.addEventListener('click', tryStartMusic, { once: true });
