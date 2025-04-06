@@ -31,7 +31,7 @@
       <button id="swap-button" class="icon-button" title="Поменять местами">
         <img src="images/icon_swap.png" alt="swipe" />
       </button>
-      <button id="settings-button" class="icon-button settings-button">
+      <button id="settings-button" class="icon-button">
         <img src="images/icon_settings.png" alt="Настройки">
       </button>
     </div>
@@ -53,6 +53,27 @@
     <div class="level-up-popup hidden" id="level-up-popup">
       <img id="level-up-img" src="images/helper_1.png" alt="котик уровня">
       <p id="level-up-text">Поздравляем!</p>
+    </div>
+    <div id="settings-overlay" class="overlay hidden">
+      <div class="settings-content">
+        <img src="images/helper_1.png" class="settings-cat" alt="Cat Helper" />
+        <button id="new-game-btn">
+          <img src="images/icon_restart.png" alt="Restart">
+          <span class="gradient-text">Новая игра</span>
+        </button>
+        <button id="watch-ad-btn">
+          <img src="images/icon_ads.png" alt="Ads">
+          <span class="gradient-text">Вознаграждение</span>
+        </button>
+        <button id="toggle-sound-btn">
+          <img id="sound-icon" src="images/icon_sound_on.png" alt="Sound">
+          <span class="gradient-text" id="sound-text">Звук</span>
+        </button>
+        <button id="close-settings-btn">
+          <img src="images/icon_close.png" alt="Close">
+          <span class="gradient-text">Продолжить</span>
+        </button>
+      </div>
     </div>
   </div>
   <script src="script.js"></script>

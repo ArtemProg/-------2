@@ -19,6 +19,8 @@ const Storage = {
   }
 };
 
+let soundEnabled = true;
+
 const colorCache = {};
 const log2Cache = {};
 
@@ -62,6 +64,9 @@ let bestScore = Storage.load("bestScore", 0);
 let currency = Storage.load("currency", 0);
 
 let isPlaying = false;
+let isPaused = false;
+const settingsOverlay = document.getElementById("settings-overlay");
+
 
 const pxToVmin = (px) => {
   const vw = window.innerWidth;
@@ -486,7 +491,7 @@ document.getElementById("restart-button").addEventListener("click", restartGame)
 
 function setupInput() {
   window.addEventListener("keydown", (e) => {
-    if (!destroyMode && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    if (!destroyMode && !isPaused && !swapMode && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
       move(e.key);
     }
@@ -504,7 +509,7 @@ function setupInput() {
     const t = e.changedTouches[0];
     const dx = t.clientX - touchStartX;
     const dy = t.clientY - touchStartY;
-    if (!destroyMode) {
+    if (!destroyMode && !isPaused && !swapMode) {
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipeDistance) {
         move(dx > 0 ? "ArrowRight" : "ArrowLeft");
       } else if (Math.abs(dy) > minSwipeDistance) {
@@ -518,6 +523,52 @@ document.getElementById("undo-button").addEventListener("click", undoMove);
 document.getElementById("destroy-button").addEventListener("click", enterDestroyMode);
 document.getElementById("swap-button").addEventListener("click", enterSwapMode);
 
+document.getElementById("settings-button").addEventListener("click", () => {
+  isPaused = true;
+  const randomHelper = Math.floor(Math.random() * 8) + 1;
+  const catImg = settingsOverlay.querySelector(".settings-cat");
+  catImg.src = `images/helper_${randomHelper}.png`;
+  const content = settingsOverlay.querySelector(".settings-content");
+  settingsOverlay.classList.remove("hidden");
+  gsap.fromTo(content, 
+    { scale: 0.5, opacity: 0 }, 
+    { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.7)" }
+  );
+});
+
+document.getElementById("close-settings-btn").addEventListener("click", () => {
+  const content = settingsOverlay.querySelector(".settings-content");
+  gsap.to(content, {
+    scale: 0.5,
+    opacity: 0,
+    duration: 0.3,
+    ease: "back.in(1.7)",
+    onComplete: () => {
+      settingsOverlay.classList.add("hidden");
+      isPaused = false;
+    }
+  });
+});
+
+document.getElementById("new-game-btn").addEventListener("click", () => {
+  settingsOverlay.classList.add("hidden");
+  isPaused = false;
+  restartGame();
+});
+
+document.getElementById("watch-ad-btn").addEventListener("click", () => {
+  alert("Реклама воспроизводится...");
+  // TODO: Реальная интеграция рекламы
+});
+
+
+document.getElementById("toggle-sound-btn").addEventListener("click", () => {
+  soundEnabled = !soundEnabled;
+  const soundText = document.getElementById("sound-text");
+  soundText.textContent = soundEnabled ? "Звук: Вкл" : "Звук: Выкл";
+  const soundIcon = document.getElementById("sound-icon");
+  soundIcon.src = soundEnabled ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
+});
 
 let destroyMode = false;
 const destroyPanel = document.getElementById("destroy-mode-panel");
@@ -755,6 +806,20 @@ function handleDestroyClick(e) {
 
   if (r === -1 || c === -1) return;
 
+  // Подсчёт количества плиток на поле
+  let tileCount = 0;
+  for (let row = 0; row < gridSize; row++) {
+    for (let col = 0; col < gridSize; col++) {
+      if (grid[row][col]) tileCount++;
+    }
+  }
+
+  // Если осталась только одна плитка — запретить уничтожение
+  if (tileCount <= 1) {
+    // alert("Нельзя уничтожить последнюю плитку!");
+    return;
+  }
+
   pushToHistory();
 
   // Получаем координаты с учётом transform
@@ -901,6 +966,8 @@ function showLevelUpPopup(level) {
     }
   );
 }
+
+
 
 function syncTileSizeWithCell() {
 
