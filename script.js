@@ -19,7 +19,16 @@ const Storage = {
   }
 };
 
-let soundEnabled = true;
+const bgMusic = document.getElementById('bg-music');
+let isSoundOn = localStorage.getItem("sound") !== "false";
+let musicReady = false;
+let musicStarted = false;
+
+{
+  const soundText = document.getElementById("sound-text");
+  soundText.textContent = isSoundOn ? "Звук: Вкл" : "Звук: Выкл";
+}
+
 
 const colorCache = {};
 const log2Cache = {};
@@ -55,7 +64,7 @@ const randomLevelUpPhrases = [
   "У тебя лапы растут откуда надо!",
   "Ты точно знаешь, как обращаться с пушистыми цифрами!"
 ];
-let highestLevelReached = 3; // уровень до 4 не показываем
+let highestLevelReached = 4; // уровень до 4 не показываем
 
 const historyStack = [];
 const HISTORY_LIMIT = 10;
@@ -422,6 +431,7 @@ function loadGameState() {
     score: entry.score,
     currency: entry.currency,
     bestScore: entry.bestScore,
+    highestLevelReached: entry?.highestLevelReached || 4,
     grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
   }));
   historyStack.length = 0;
@@ -563,11 +573,21 @@ document.getElementById("watch-ad-btn").addEventListener("click", () => {
 
 
 document.getElementById("toggle-sound-btn").addEventListener("click", () => {
-  soundEnabled = !soundEnabled;
+  isSoundOn = !isSoundOn;
+
+  localStorage.setItem("sound", isSoundOn); // сохраним настройку
+  
   const soundText = document.getElementById("sound-text");
-  soundText.textContent = soundEnabled ? "Звук: Вкл" : "Звук: Выкл";
+  soundText.textContent = isSoundOn ? "Звук: Вкл" : "Звук: Выкл";
   const soundIcon = document.getElementById("sound-icon");
-  soundIcon.src = soundEnabled ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
+  soundIcon.src = isSoundOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
+
+  if (isSoundOn && musicReady) {
+    bgMusic.play();
+  } else {
+    bgMusic.pause();
+  }
+
 });
 
 let destroyMode = false;
@@ -672,98 +692,6 @@ function handleSwapClick(e) {
     elB.classList.remove("selected");
 
     selectedTiles = [];
-    exitSwapMode();
-    saveGameState();
-  }
-}
-
-
-function handleSwapClick1(e) {
-  const tile = e.target.closest(".tile");
-  if (!tile) {
-    exitSwapMode();
-    return;
-  }
-
-  if (selectedTiles.includes(tile)) return;
-
-  let r = -1, c = -1;
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col < gridSize; col++) {
-      if (grid[row][col]?.el === tile) {
-        r = row;
-        c = col;
-        break;
-      }
-    }
-    if (r !== -1) break;
-  }
-
-  if (r === -1 || c === -1) return;
-
-  selectedTiles.push(tile);
-
-  // Подсветим выбранную плитку
-  tile.classList.add("selected");
-
-  if (selectedTiles.length === 2) {
-    
-    const [tile1, tile2] = selectedTiles;
-    const pos1 = findTilePosition(tile1);
-    const pos2 = findTilePosition(tile2);
-
-    if (!pos1 || !pos2) {
-      exitSwapMode();
-      return;
-    }
-
-    // Анимация перелёта
-    const [r1, c1] = pos1;
-    const [r2, c2] = pos2;
-    const cell1 = grid[r1][c1];
-    const cell2 = grid[r2][c2];
-
-    // Обмен DOM-плитками
-    grid[r1][c1] = cell2;
-    grid[r2][c2] = cell1;
-
-    setTilePosition(cell1.el, r2, c2);
-    setTilePosition(cell2.el, r1, c1);
-
-    // Снять выделение и завершить режим
-    selectedTiles.forEach(t => t.classList.remove("selected"));
-    selectedTiles = [];
-
-    saveGameState();
-    exitSwapMode();
-
-    return
-    
-    // Меняем местами элементы в DOM
-    const tempPosA = { x: first.c * cellSize + gap, y: first.r * cellSize + gap };
-    const tempPosB = { x: second.c * cellSize + gap, y: second.r * cellSize + gap };
-
-    gsap.to(tileA, {
-      x: tempPosB.x + 'vmin',
-      y: tempPosB.y + 'vmin',
-      duration: 0.3,
-      onComplete: () => setTilePosition(tileA, second.r, second.c)
-    });
-
-    gsap.to(tileB, {
-      x: tempPosA.x + 'vmin',
-      y: tempPosA.y + 'vmin',
-      duration: 0.3,
-      onComplete: () => setTilePosition(tileB, first.r, first.c)
-    });
-
-    // Меняем данные в grid
-    [grid[first.r][first.c], grid[second.r][second.c]] = [tileB, tileA];
-
-    // Убираем подсветку
-    tileA.classList.remove("selected");
-    tileB.classList.remove("selected");
-
     exitSwapMode();
     saveGameState();
   }
@@ -961,7 +889,7 @@ function showLevelUpPopup(level) {
               isPlaying = true;
             }
           });
-        }, 3000);
+        }, 2000);
       }
     }
   );
@@ -1014,6 +942,36 @@ function adjustGameContainerMargin() {
 
 window.addEventListener("load", adjustGameContainerMargin);
 window.addEventListener('resize', syncTileSizeWithCell);
+
+// ✅ Когда музыка загрузилась
+bgMusic.addEventListener('canplaythrough', () => {
+  musicReady = true;
+});
+
+
+function tryStartMusic() {
+  if (musicReady && !musicStarted && isSoundOn) {
+    bgMusic.volume = 0.3;
+    bgMusic.loop = true;
+
+    bgMusic.play().then(() => {
+      console.log("Музыка играет!");
+      musicStarted = true;
+    }).catch(err => {
+      console.warn("Ошибка запуска музыки:", err);
+    });
+
+    document.removeEventListener("click", tryStartMusic);
+    window.removeEventListener("touchstart", tryStartMusic);
+    window.removeEventListener("keydown", tryStartMusic);
+    
+  }
+}
+
+// Навешиваем на первое взаимодействие
+document.addEventListener("click", tryStartMusic);
+window.addEventListener("touchstart", tryStartMusic);
+window.addEventListener("keydown", tryStartMusic);
 
 startGame(false);
 setupInput();

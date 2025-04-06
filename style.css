@@ -294,6 +294,7 @@ body::-webkit-scrollbar {
   justify-content: center;
   align-items: center;
   transition: transform 0.1s ease;
+  aspect-ratio: 1 / 1;
 }
 
 .icon-button:hover {
@@ -325,11 +326,11 @@ body::-webkit-scrollbar {
 
 
 #ad-button {
-  margin-right: 2vmin;
+  margin-right: 1vmin;
 }
 
 #settings-button {
-  margin-left: 2vmin;
+  margin-left: 1vmin;
 }
 
 .tile-destroying {
@@ -605,4 +606,29 @@ body::-webkit-scrollbar {
   background: linear-gradient(to bottom, #f9d976, #f39f86);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.icon-button {
+  position: relative;
+}
+.reward-label {
+  position: absolute;
+  bottom: -1vmin;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.5vmin 1vmin;
+  border-radius: 1vmin;
+  font-size: 2vmin;
+  font-weight: bold;
+  box-shadow: 0 0.3vmin 0.6vmin rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+.reward-label img {
+  width: 2vmin;
+  height: 2vmin;
+  margin-right: 0.5vmin;
 }
