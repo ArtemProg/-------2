@@ -9,45 +9,52 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
-  <div class="top-panel">
-    <div class="currency"><img src="images/icon_coin.png" alt="монеты" /><span id="currency">0</span></div>
-    <div class="score-large"><span id="score">0</span></div>
-    <div class="best"><img src="images/icon_crown.png" alt="лучший" /><span id="best">0</span></div>
-  </div>
-  <div class="game-container">
-    <div class="grid-container" id="grid"></div>
-  </div>
-  <div class="bottom-buttons">
-    <button id="undo-button" class="icon-button" title="Отменить ход">
-      <img src="images/icon_undo.png" alt="undo" />
-    </button>
-    <button id="destroy-button" class="icon-button" title="Удалить плитку">
-      <img src="images/icon_remove.png" alt="remove" />
-    </button>
-    <button id="swap-button" class="icon-button" title="Поменять местами">
-      <img src="images/icon_swap.png" alt="swipe" />
-    </button>
-  </div>
-  <div id="destroy-mode-panel" class="destroy-panel hidden">
-    <img src="images/cat_helper.png" alt="кот" class="cat-icon" />
-    <p>Выберите плитку для уничтожения</p>
-  </div>
-  <div id="swap-mode-panel" class="swap-panel hidden">
-    <img src="images/cat_helper.png" alt="кот думает">
-    <p>Выберите две плитки по очереди, чтобы поменять их местами</p>
-  </div>
-  <div class="overlay hidden" id="overlay">
-    <div class="overlay-content">
-      <h1 id="overlay-title">Ты победил!</h1>
-      <p id="overlay-subtitle">Ты достиг уровня 4!</p>
-      <button id="restart-button">ИГРАТЬ СНОВА</button>
+  <div id="game-wrapper">
+    <div class="top-panel">
+      <div class="currency"><img src="images/diamond.png" alt="монеты" /><span id="currency">0</span></div>
+      <div class="score-large"><span id="score">0</span></div>
+      <div class="best"><img src="images/star.png" alt="лучший" /><span id="best">0</span></div>
+    </div>
+    <div class="game-container">
+      <div class="grid-container" id="grid"></div>
+    </div>
+    <div class="bottom-buttons">
+      <button id="ad-button" class="icon-button" title="Вознаграждение">
+        <img src="images/icon_ad.png" alt="undo" />
+      </button>
+      <button id="undo-button" class="icon-button" title="Отменить ход">
+        <img src="images/icon_undo.png" alt="undo" />
+      </button>
+      <button id="destroy-button" class="icon-button" title="Удалить плитку">
+        <img src="images/icon_remove.png" alt="remove" />
+      </button>
+      <button id="swap-button" class="icon-button" title="Поменять местами">
+        <img src="images/icon_swap.png" alt="swipe" />
+      </button>
+      <button id="settings-button" class="icon-button settings-button">
+        <img src="images/icon_settings.png" alt="Настройки">
+      </button>
+    </div>
+    <div id="destroy-mode-panel" class="helper-panel hidden">
+      <img src="images/helper_1.png" alt="кот" class="helper-img" />
+      <p>Выберите плитку для уничтожения</p>
+    </div>
+    <div id="swap-mode-panel" class="helper-panel hidden">
+      <img src="images/helper_1.png" alt="кот думает" class="helper-img">
+      <p>Выберите две плитки по очереди, чтобы поменять их местами</p>
+    </div>
+    <div class="overlay hidden" id="overlay">
+      <div class="overlay-content">
+        <h1 id="overlay-title">Ты победил!</h1>
+        <p id="overlay-subtitle">Ты достиг уровня 4!</p>
+        <button id="restart-button">ИГРАТЬ СНОВА</button>
+      </div>
+    </div>
+    <div class="level-up-popup hidden" id="level-up-popup">
+      <img id="level-up-img" src="images/helper_1.png" alt="котик уровня">
+      <p id="level-up-text">Поздравляем!</p>
     </div>
   </div>
-  <div class="level-up-popup hidden" id="level-up-popup">
-    <img id="level-up-img" src="" alt="котик уровня">
-    <p id="level-up-text">Поздравляем!</p>
-  </div>
-  
   <script src="script.js"></script>
 </body>
 </html>

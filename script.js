@@ -62,10 +62,20 @@ let bestScore = Storage.load("bestScore", 0);
 let currency = Storage.load("currency", 0);
 
 let isPlaying = false;
+
+const pxToVmin = (px) => {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const vmin = Math.min(vw, vh);
+  return (px / vmin) * 100;
+};
+
 const gridSize = 4;
-const tileSize = window.matchMedia("(orientation: portrait)").matches ? 21 : 18;
+// const tileSize = window.matchMedia("(orientation: portrait)").matches ? 21 : 18;
 const gap = 2;
-const cellSize = tileSize + gap;
+let tileSize;
+let cellSize;
+
 
 const gridElement = document.getElementById("grid");
 let grid = [];
@@ -136,6 +146,7 @@ function createGrid() {
       grid[r][c] = null;
     }
   }
+  syncTileSizeWithCell();
 }
 
 function spawnTile() {
@@ -538,7 +549,10 @@ function exitSwapMode() {
   document.removeEventListener("click", handleSwapClick);
 
   // Убираем подсветку
-  selectedTiles.forEach(tile => tile.classList.remove("selected"));
+  selectedTiles.forEach(tile => {
+    const el = grid[tile.r][tile.c].el;
+    el.classList.remove("selected")
+  });
   selectedTiles = [];
 }
 
@@ -571,6 +585,9 @@ function handleSwapClick(e) {
   tile.classList.add("selected");
 
   if (selectedTiles.length === 2) {
+
+    pushToHistory();
+
     const [first, second] = selectedTiles;
     const tileA = grid[first.r][first.c];
     const tileB = grid[second.r][second.c];
@@ -738,6 +755,8 @@ function handleDestroyClick(e) {
 
   if (r === -1 || c === -1) return;
 
+  pushToHistory();
+
   // Получаем координаты с учётом transform
   const originalTransform = tile.style.transform;
   tile.style.transform = "none";
@@ -772,7 +791,7 @@ function handleDestroyClick(e) {
       y: dy,
       opacity: 0,
       scale: 0.5 + Math.random(),
-      duration: 0.6,
+      duration: 0.8,
       ease: "power2.out",
       onComplete: () => p.remove()
     });
@@ -786,7 +805,7 @@ function handleDestroyClick(e) {
         gsap.to(tile, {
           opacity: 0,
           scale: 1.1,
-          duration: 0.3,
+          duration: 0.7,
           ease: "power3.in",
           onComplete: () => {
             destroyTile(tile, r, c);
@@ -799,7 +818,7 @@ function handleDestroyClick(e) {
   // Тряска
   gsap.fromTo(tile, 
     { x: x - 30 }, 
-    { x: x + 30, yoyo: true, repeat: 5, duration: 0.03, ease: "power1.inOut", onComplete: () => {
+    { x: x + 30, yoyo: true, repeat: 5, duration: 0.04, ease: "power1.inOut", onComplete: () => {
       gsap.to(tile, { x: x, duration: 0.05 });
     }}
   );
@@ -808,6 +827,7 @@ function handleDestroyClick(e) {
 
 function enterDestroyMode() {
   destroyMode = true;
+  updateHelperPanel("destroy-mode-panel");
   destroyPanel.classList.remove("hidden");
 
   setTimeout(() => {
@@ -817,9 +837,12 @@ function enterDestroyMode() {
 
 function exitDestroyMode() {
   destroyMode = false;
+  updateHelperPanel("swap-mode-panel");
   destroyPanel.classList.add("hidden");
   document.removeEventListener("click", handleDestroyClick);
 }
+
+
 
 function destroyTile(tileElement, r, c) {
   gridElement.removeChild(tileElement);
@@ -832,12 +855,26 @@ function getRandomLevelUpPhrase() {
   return randomLevelUpPhrases[Math.floor(Math.random() * randomLevelUpPhrases.length)];
 }
 
+function updateHelperPanel(panelId) {
+  const helperNumber = Math.floor(Math.random() * 8) + 1;
+  //const phrase = motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
+
+  const panel = document.getElementById(panelId);
+  const img = panel.querySelector(".helper-img");
+  //const text = panel.querySelector(".helper-text");
+
+  img.src = `./images/helper_${helperNumber}.png`;
+  //text.textContent = phrase;
+}
+
 function showLevelUpPopup(level) {
   const popup = document.getElementById("level-up-popup");
   const img = document.getElementById("level-up-img");
   const text = document.getElementById("level-up-text");
 
-  img.src = `images/img_${level}.png`;
+  const helperNumber = Math.floor(Math.random() * 8) + 1;
+  img.src = `./images/helper_${helperNumber}.png`;
+
   text.textContent = getRandomLevelUpPhrase();
 
   popup.classList.remove("hidden");
@@ -846,7 +883,7 @@ function showLevelUpPopup(level) {
   gsap.fromTo(popup,
     { scale: 0.5, opacity: 0 },
     {
-      scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.7)",
+      scale: 1, opacity: 1, duration: 0.7, ease: "back.out(1.7)",
       onComplete: () => {
         setTimeout(() => {
           gsap.to(popup, {
@@ -859,11 +896,57 @@ function showLevelUpPopup(level) {
               isPlaying = true;
             }
           });
-        }, 2000);
+        }, 3000);
       }
     }
   );
 }
+
+function syncTileSizeWithCell() {
+
+  adjustGameContainerMargin();
+
+  const cell = document.querySelector('.cell');
+  if (!cell) return;
+
+  const rect = cell.getBoundingClientRect();
+  tileSize = pxToVmin(rect.width);
+  cellSize = tileSize + gap
+
+  const style = document.documentElement.style;
+  style.setProperty('--tile-size', `${tileSize.toFixed(2)}vmin`);
+}
+
+function adjustGameContainerMargin() {
+  const wrapper = document.getElementById("game-wrapper");
+  const topPanel = document.querySelector(".top-panel");
+  const gameContainer = document.querySelector(".game-container");
+  const bottomButtons = document.querySelector(".bottom-buttons");
+
+  if (!wrapper || !topPanel || !gameContainer || !bottomButtons) return;
+
+  const style = getComputedStyle(bottomButtons);
+  const existingTopMargin = parseFloat(style.marginTop);
+
+  // Получаем доступную высоту и суммируем высоты панелей
+  const wrapperHeight = wrapper.clientHeight;
+  const topPanelHeight = topPanel.offsetHeight;
+  const gameContainerHeight = gameContainer.offsetHeight;
+  const bottomButtonsHeight = bottomButtons.offsetHeight + existingTopMargin;
+
+  const remainingSpace = wrapperHeight - topPanelHeight - gameContainerHeight - bottomButtonsHeight;
+
+  // Устанавливаем отступ сверху, если есть хотя бы 2vmin свободного пространства
+  if (remainingSpace > 0) {
+    const marginVmin = Math.min(remainingSpace / window.innerHeight * 100, 15); // максимум 5vmin
+    gameContainer.style.marginTop = `${marginVmin}vmin`;
+  } else {
+    gameContainer.style.marginTop = "0";
+  }
+}
+
+window.addEventListener("load", adjustGameContainerMargin);
+window.addEventListener('resize', syncTileSizeWithCell);
 
 startGame(false);
 setupInput();
