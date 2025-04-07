@@ -1,3 +1,7 @@
+let ysdk;
+let player;
+let isPlayerAuthorized = false;
+
 // ===== ХРАНИЛИЩЕ ДАННЫХ =====
 const Storage = {
   save(key, value) {
@@ -18,6 +22,8 @@ const Storage = {
     return fallback;
   }
 };
+
+const preloaderImages = {};
 
 const bgMusic = document.getElementById('bg-music');
 let isSoundOn = localStorage.getItem("sound") !== "false";
@@ -94,6 +100,24 @@ let cellSize;
 const gridElement = document.getElementById("grid");
 let grid = [];
 let score = 0;
+
+
+function preloadImages(paths, callback) {
+  let loadedCount = 0;
+  const totalImages = paths.length;
+
+  paths.forEach((path) => {
+    const img = new Image();
+    img.onload = img.onerror = () => {
+      loadedCount++;
+      if (loadedCount === totalImages) {
+        callback();
+      }
+    };
+    img.src = path;
+    preloaderImages[path] = img;
+  });
+}
 
 function getSnapshot() {
   return {
@@ -255,7 +279,13 @@ function setTileSprite(spriteElement, value) {
   const level = getLevel(value);
   const maxLevel = 15;
   const clamped = Math.min(level, maxLevel);
-  spriteElement.style.backgroundImage = `url('./images/img_${clamped}.png')`;
+
+  const path = `images/img_${clamped}.png`;
+  const cachedImage = preloaderImages[path];
+  if (cachedImage && spriteElement) {
+    spriteElement.style.backgroundImage = `url('${cachedImage.src}')`;
+
+  }
 }
 
 function move(direction) {
@@ -477,7 +507,7 @@ function loadGameState() {
   return true;
 }
 
-function startGame(isNewGame = true) {
+async function startGame(isNewGame = true) {
 
   if (!Storage.load("hasEnteredBefore", false)) {
     currency += 400;
@@ -488,7 +518,12 @@ function startGame(isNewGame = true) {
   historyStack.length = 0;
   score = 0;
 
-  if (!isNewGame && loadGameState()) {
+  // if (!isNewGame && loadGameState()) {
+  //   isPlaying = true;
+  //   return;
+  // }
+
+  if (!isNewGame && await loadGameStateFromYandex()) {
     isPlaying = true;
     return;
   }
@@ -553,7 +588,11 @@ document.getElementById("settings-button").addEventListener("click", () => {
   isPaused = true;
   const randomHelper = Math.floor(Math.random() * 8) + 1;
   const catImg = settingsOverlay.querySelector(".settings-cat");
-  catImg.src = `images/helper_${randomHelper}.png`;
+  const path = `images/helper_${randomHelper}.png`;
+  const cachedImage = preloaderImages[path];
+  if (cachedImage && catImg) {
+    catImg.src = cachedImage.src;
+  }
   const content = settingsOverlay.querySelector(".settings-content");
   settingsOverlay.classList.remove("hidden");
   gsap.fromTo(content, 
@@ -891,8 +930,15 @@ function updateHelperPanel(panelId) {
   const img = panel.querySelector(".helper-img");
   //const text = panel.querySelector(".helper-text");
 
-  img.src = `./images/helper_${helperNumber}.png`;
+  // img.src = `./images/helper_${helperNumber}.png`;
   //text.textContent = phrase;
+
+  const path = `images/helper_${helperNumber}.png`;
+  const cachedImage = preloaderImages[path];
+  if (cachedImage && img) {
+    img.src = cachedImage.src;
+  }
+
 }
 
 function showLevelUpPopup(level) {
@@ -901,7 +947,12 @@ function showLevelUpPopup(level) {
   const text = document.getElementById("level-up-text");
 
   const helperNumber = Math.floor(Math.random() * 8) + 1;
-  img.src = `./images/helper_${helperNumber}.png`;
+
+  const path = `images/helper_${helperNumber}.png`;
+  const cachedImage = preloaderImages[path];
+  if (cachedImage && img) {
+    img.src = cachedImage.src;
+  }
 
   text.textContent = getRandomLevelUpPhrase();
 
@@ -1008,10 +1059,123 @@ function tryStartMusic() {
   }
 }
 
+window.addEventListener("load", () => {
+  YaGames.init().then(sdk => {
+    ysdk = sdk;
+    console.log("Yandex SDK инициализирован");
+
+    
 
 
-startGame(false);
-setupInput();
+    let imagePaths = [];
+    for(let i = 1; i<16; i++){
+      imagePaths.push(`images/img_${i}.png`)
+    }
+    for(let i = 1; i<9; i++){
+      imagePaths.push(`images/helper_${i}.png`)
+    }
+
+    preloadImages(imagePaths, () => {
+      console.log('Все изображения загружены. Игра может начинаться.');
+      
+      startGame(false);
+      initPlayer();
+      setupInput();
+      
+    });
+
+    // Можно начать подгружать игрока и рекламу:
+    
+    //initAds();
+  });
+})
+
+function initPlayer() {
+  ysdk.getPlayer().then(_player => {
+    player = _player;
+    isPlayerAuthorized = player.getMode() === 'full';
+    console.log("Игрок загружен:", player.getName());
+    loadCloudSave();
+  });
+}
+
+function loadCloudSave() {
+  player.getData(["gameState"]).then(data => {
+    const state = data.gameState;
+    if (state) {
+      // Загрузить сохранение
+      console.log("Сохранение загружено", state);
+      loadGameStateFromYandex(state);
+    } else {
+      startGame();
+    }
+  });
+}
+
+async function loadGameStateFromYandex() {
+  if (!ysdk || !ysdk.getStorage) return false;
+
+  try {
+    const storage = await ysdk.getStorage();
+    const state = await JSON.parse(storage?.gameState);
+
+    if (!state || !state.grid) return false;
+
+    score = state.score || 0;
+    bestScore = state.bestScore || 0;
+    currency = state.currency || 0;
+
+    const tempHistory = (state.history || []).map(entry => ({
+      score: entry.score,
+      currency: entry.currency,
+      bestScore: entry.bestScore,
+      highestLevelReached: entry?.highestLevelReached || 4,
+      grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
+    }));
+    historyStack.length = 0;
+    historyStack.push(...tempHistory);
+
+    updateScoreDisplay();
+    updateBestScoreDisplay();
+    updateCurrencyDisplay();
+
+    gridElement.innerHTML = "";
+    grid = [];
+    createGrid();
+
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        const cell = state.grid[r][c];
+        if (cell) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.innerHTML = `
+            <div class="tile-inner">
+              <div class="tile-sprite"></div>
+              <div class="tile-level"><span>${getLevel(cell.value)}</span></div>
+            </div>`;
+          grid[r][c] = { el: tile, value: cell.value };
+          setTilePosition(tile, r, c);
+          styleTile(tile, cell.value);
+          setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
+          gridElement.appendChild(tile);
+        }
+      }
+    }
+
+    return true;
+
+  } catch (e) {
+    console.error("Ошибка при загрузке из Яндекс SDK:", e);
+    return false;
+  }
+}
+
+
+
+function saveCloudSave(state) {
+  player.setData({ gameState: state });
+}
 
 // Навешиваем на первое взаимодействие
 document.addEventListener("click", tryStartMusic);

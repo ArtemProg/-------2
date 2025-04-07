@@ -276,7 +276,7 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: clamp(2vmin, 3vmin, 4vmin);
+  gap: 1vmin;
   margin-top: 5vmin;
 }
 
@@ -288,8 +288,8 @@ body::-webkit-scrollbar {
   background-color: #fdf3dd;
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   cursor: pointer;
-  width: 12vmin;
-  height: 12vmin;
+  width: 11vmin;
+  height: 11vmin;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -324,14 +324,14 @@ body::-webkit-scrollbar {
   background: #e09e20;
 } */
 
-
+/* 
 #ad-button {
   margin-right: 1vmin;
 }
 
 #settings-button {
   margin-left: 1vmin;
-}
+} */
 
 .tile-destroying {
   z-index: 100;
