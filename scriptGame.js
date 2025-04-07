@@ -176,26 +176,26 @@ function showLevelUpPopup(level) {
     game.isPlaying = false;
   
     gsap.fromTo(popup,
-      { scale: 0.5, opacity: 0 },
-      {
-        scale: 1, opacity: 1, duration: 0.7, ease: "back.out(1.7)",
-        onComplete: () => {
-          setTimeout(() => {
-            gsap.to(popup, {
-              scale: 0.5,
-              opacity: 0,
-              duration: 0.3,
-              ease: "back.in(1.7)",
-              onComplete: () => {
-                popup.classList.add("hidden");
-                game.isPlaying = true;
-              }
-            });
-          }, 2000);
+        { scale: 0.5, opacity: 0 },
+        {
+            scale: 1, opacity: 1, duration: 0.7, ease: "back.out(1.7)",
+            onComplete: () => {
+                setTimeout(() => {
+                    gsap.to(popup, {
+                        scale: 0.5,
+                        opacity: 0,
+                        duration: 0.3,
+                        ease: "back.in(1.7)",
+                        onComplete: () => {
+                            popup.classList.add("hidden");
+                            game.isPlaying = true;
+                        }
+                    });
+                }, 2000);
+            }
         }
-      }
     );
-  }
+}
 
 //
 
@@ -227,8 +227,8 @@ function spawnTile() {
 function checkWin(value) {
     const level = getLevel(value);
     if (level >= 4 && level > game.highestLevelReached) {
-      game.highestLevelReached = level;
-      showLevelUpPopup(level);
+        game.highestLevelReached = level;
+        showLevelUpPopup(level);
     }
 }
 
@@ -289,10 +289,10 @@ function adjustGameContainerMargin() {
   
     // Устанавливаем отступ сверху, если есть хотя бы 2vmin свободного пространства
     if (remainingSpace > 0) {
-      const marginVmin = Math.min(remainingSpace / window.innerHeight * 100, 15); // максимум 5vmin
-      gameContainer.style.marginTop = `${marginVmin}vmin`;
+        const marginVmin = Math.min(remainingSpace / window.innerHeight * 100, 15); // максимум 5vmin
+        gameContainer.style.marginTop = `${marginVmin}vmin`;
     } else {
-      gameContainer.style.marginTop = "0";
+        gameContainer.style.marginTop = "0";
     }
 }
 
@@ -320,11 +320,11 @@ function styleTile(tile, value) {
     if (levelElem) levelElem.textContent = level;
   
     if (value < 100) {
-      tile.style.fontSize = '7vmin';
+        tile.style.fontSize = '7vmin';
     } else if (value < 1000) {
-      tile.style.fontSize = '6vmin';
+        tile.style.fontSize = '6vmin';
     } else {
-      tile.style.fontSize = '5vmin';
+        tile.style.fontSize = '5vmin';
     }
 }
 
@@ -392,10 +392,10 @@ function getColorForLevel(level) {
     let colors;
   
     if (game.predefinedTileColors[level]) {
-      colors = game.predefinedTileColors[level];
+        colors = game.predefinedTileColors[level];
     } else {
       const hue = (level * 35) % 360; // циклично по кругу
-      colors = [`hsl(${hue}, 70%, 60%)`, '#f9f6f2'];
+        colors = [`hsl(${hue}, 70%, 60%)`, '#f9f6f2'];
     }
   
     game.colorCache[level] = colors;
