@@ -1,5 +1,77 @@
 let ysdk;
 
+const PlayerStatsManager = {
+    pendingStats: {},
+    saveTimeout: null,
+    lastSaveTime: 0,
+    SAVE_DELAY: 2000, // минимальная задержка между запросами в мс
+  
+    init() {
+        // Подписка на событие "вкладка скрыта"
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden' || true) {
+                this.forceSave(true); // Принудительно сохраняем, без задержки
+            }
+        });
+    },
+
+    /**
+     * Обновляет данные, которые нужно сохранить, и запускает сохранение
+     * @param {Object} newStats - Объект с ключами и значениями для сохранения
+     */
+    update(newStats) {
+      this.pendingStats = { ...this.pendingStats, ...newStats };
+  
+      const now = Date.now();
+      const timeSinceLastSave = now - this.lastSaveTime;
+  
+      if (timeSinceLastSave >= this.SAVE_DELAY) {
+        this.save();
+      } else {
+        clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => this.save(), this.SAVE_DELAY - timeSinceLastSave);
+      }
+    },
+  
+    /**
+     * Выполняет сохранение данных в Yandex SDK
+     */
+    save() {
+      if (!ysdk || !ysdk.getPlayer) return;
+  
+      ysdk.getPlayer().then(player => {
+        return player.setData(this.pendingStats);
+      }).then(() => {
+        console.log("✅ Данные игрока сохранены:", this.pendingStats);
+        this.pendingStats = {};
+        this.lastSaveTime = Date.now();
+      }).catch(err => {
+        console.error("❌ Ошибка при сохранении данных:", err);
+      });
+    },
+
+    forceSave(isHidden = false) {
+
+        if (isHidden) {
+
+            const newStats = {
+                currency: game.currency,
+                bestScore: game.bestScore,
+                hasEnteredBefore: true,
+                historyStack: game.historyStack,
+                currentDate: new Date(),
+            };
+
+            this.pendingStats = { ...this.pendingStats, ...newStats };
+        }
+
+        if (Object.keys(this.pendingStats).length > 0) {
+          this.save();
+        }
+    }
+};
+
+
 const game = {
     preloaderImages: [],
     grid: [],
@@ -22,6 +94,9 @@ const game = {
     isSoundOn: false,
     musicReady: false,
     musicStarted: false,
+
+    swapMode: false,
+    destroyMode: false,
 
     isPlaying: false,
     isPaused: false,
@@ -64,7 +139,7 @@ function initGame(callback) {
 
     ysdk.getPlayer().then(_player => {
         game.player = _player;
-        loadCloudSave();
+        return loadCloudSave();
     }).catch(err => {
         // Ошибка при инициализации объекта Player.
         game.player = {};
@@ -81,11 +156,26 @@ function initGame(callback) {
         }
 
         startGame();
+        setupInput();
+
+        PlayerStatsManager.init();
 
     });
 }
 
 function loadCloudSave() {
+
+    return game.player.getData().then(data => {
+        const state = data;
+        if (state) {
+          
+            if (state.currency) game.currency = state.currency;
+            if (state.bestScore) game.bestScore = state.bestScore;
+          
+        } else {
+          
+        }
+    });
 
 }
 
@@ -142,7 +232,8 @@ function startGame() {
 }
 
 
-//
+//-------------------------------------
+
 function updateBestScoreDisplay() {
     if (game.elBestScore) game.elBestScore.textContent = game.bestScore;
 }
@@ -155,7 +246,7 @@ function updateScoreDisplay() {
 
 
 
-//
+//-------------------------------------
 
 function showLevelUpPopup(level) {
     const popup = document.getElementById("level-up-popup");
@@ -197,7 +288,81 @@ function showLevelUpPopup(level) {
     );
 }
 
-//
+//-------------------------------------
+
+function move(direction) {
+    
+    if (!game.isPlaying) return;
+  
+    let snapshotBoard = getSnapshotBoard();
+  
+    let moved = false;
+    const dir = {
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+    }[direction];
+    if (!dir) return;
+    const range = [...Array(game.gridSize).keys()];
+    const iterate = (dir.x > 0 || dir.y > 0) ? range.reverse() : range;
+    const merged = Array.from({ length: game.gridSize }, () => Array(game.gridSize).fill(false));
+    for (let r of iterate) {
+      for (let c of iterate) {
+        const cell = game.grid[r][c];
+        if (!cell) continue;
+        let nr = r, nc = c;
+        while (true) {
+          const tr = nr + dir.y, tc = nc + dir.x;
+          if (tr < 0 || tr >= game.gridSize || tc < 0 || tc >= game.gridSize) break;
+          if (!game.grid[tr][tc]) {
+            nr = tr;
+            nc = tc;
+          } else if (game.grid[tr][tc].value === cell.value && !merged[tr][tc]) {
+            nr = tr;
+            nc = tc;
+            merged[nr][nc] = true;
+            break;
+          } else break;
+        }
+        if (nr !== r || nc !== c) {
+          moved = true;
+          const fromTile = cell.el;
+          const toCell = game.grid[nr][nc];
+          setTilePosition(fromTile, nr, nc);
+          if (toCell) {
+            const toTile = toCell.el;
+            const newValue = toCell.value * 2;
+            game.grid[r][c] = null;
+            setTimeout(() => {
+            game.gridElement.removeChild(fromTile);
+            toCell.value = newValue;
+            toTile.innerHTML = `
+                <div class="tile-inner pop">
+                <div class="tile-sprite"></div>
+                <div class="tile-level"><span>${getLevel(newValue)}</span></div>
+                </div>`;
+            styleTile(toTile, newValue);
+            setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
+            addScore(newValue);
+            checkWin(newValue);
+            }, 150);
+          } else {
+            game.grid[nr][nc] = cell;
+            game.grid[r][c] = null;
+          }
+        }
+      }
+    }
+    if (moved) {
+        setTimeout(() => {
+            spawnTile();
+            // checkGameOver();
+            // saveGameState();
+            pushToHistory(snapshotBoard);
+        }, 150);
+    }
+}
 
 function spawnTile() {
     const empty = [];
@@ -296,7 +461,7 @@ function adjustGameContainerMargin() {
     }
 }
 
-//
+//-------------------------------------
 
 function setTilePosition(tile, r, c) {
     const x = c * game.cellSize + game.gap;
@@ -341,7 +506,7 @@ function setTileSprite(spriteElement, value) {
 }
 
 function getRandomLevelUpPhrase() {
-    return randomLevelUpPhrases[Math.floor(Math.random() * randomLevelUpPhrases.length)];
+    return game.randomLevelUpPhrases[Math.floor(Math.random() * game.randomLevelUpPhrases.length)];
 }
 
 // loadingResources
@@ -378,7 +543,8 @@ function preloadImages(paths, callback) {
     });
 }
 
-//
+//-------------------------------------
+
 function getLevel(value) {
     if (game.log2Cache[value]) return game.log2Cache[value];
     const level = Math.log2(value);
@@ -402,3 +568,69 @@ function getColorForLevel(level) {
   
     return colors;
 }
+
+//-------------------------------------
+
+function addScore(points) {
+    game.score += points;
+    updateScoreDisplay();
+    if (game.score > game.bestScore) {
+        game.bestScore = game.score;
+        //Storage.save("bestScore", bestScore);
+        updateBestScoreDisplay();
+    }
+}
+
+//-------------------------------------
+
+function setupInput() {
+    window.addEventListener("keydown", (e) => {
+      if (!(game.isPaused || game.destroyMode || game.swapMode) && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        move(e.key);
+      }
+    });
+  
+    let touchStartX, touchStartY;
+    const minSwipeDistance = 30;
+    window.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+    });
+  
+    window.addEventListener("touchend", (e) => {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStartX;
+      const dy = t.clientY - touchStartY;
+      if (!(game.isPaused || game.destroyMode || game.swapMode)) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipeDistance) {
+          move(dx > 0 ? "ArrowRight" : "ArrowLeft");
+        } else if (Math.abs(dy) > minSwipeDistance) {
+          move(dy > 0 ? "ArrowDown" : "ArrowUp");
+        }
+      }
+    }, { passive: false });
+}
+
+//------------------------------------------
+
+function getSnapshotBoard() {
+    return {
+      score: game.score,
+      grid: game.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
+    };
+}
+
+function pushToHistory(snapshot) {
+    game.historyStack.push(snapshot);
+    if (game.historyStack.length > game.HISTORY_LIMIT) {
+        game.historyStack.shift();
+    }
+}
+
+// function getSnapshotState() {
+//     return {
+//         be
+//     }
+// }
