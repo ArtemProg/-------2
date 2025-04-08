@@ -9,9 +9,12 @@ const PlayerStatsManager = {
     init() {
         // Подписка на событие "вкладка скрыта"
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden' || true) {
-                this.forceSave(true); // Принудительно сохраняем, без задержки
+            if (document.visibilityState === 'hidden') {
+                this.forceSave(); // Принудительно сохраняем, без задержки
             }
+        });
+        window.addEventListener('beforeunload', () => {
+            PlayerStatsManager.forceSave(); // Повторная попытка
         });
     },
 
@@ -33,6 +36,20 @@ const PlayerStatsManager = {
       }
     },
   
+    prepareChanges() {
+
+        const newStats = {
+            currency: game.currency,
+            bestScore: game.bestScore,
+            hasEnteredBefore: true,
+            historyStack: game.historyStack,
+            currentDate: new Date(),
+            currentGame: getSnapshotBoard(),
+        };
+
+        this.pendingStats = { ...this.pendingStats, ...newStats };
+    },
+
     /**
      * Выполняет сохранение данных в Yandex SDK
      */
@@ -50,21 +67,7 @@ const PlayerStatsManager = {
       });
     },
 
-    forceSave(isHidden = false) {
-
-        if (isHidden) {
-
-            const newStats = {
-                currency: game.currency,
-                bestScore: game.bestScore,
-                hasEnteredBefore: true,
-                historyStack: game.historyStack,
-                currentDate: new Date(),
-            };
-
-            this.pendingStats = { ...this.pendingStats, ...newStats };
-        }
-
+    forceSave() {
         if (Object.keys(this.pendingStats).length > 0) {
           this.save();
         }
@@ -87,6 +90,11 @@ const game = {
     elBestScore: document.getElementById("best"),
     elCurrency: document.getElementById("currency"),
     elScore: document.getElementById("score"),
+    destroyPanel: document.getElementById("destroy-mode-panel"),
+    swapPanel: document.getElementById("swap-mode-panel"),
+    bgMusic: document.getElementById('bg-music'),
+
+    selectedTiles: [],
 
     historyStack: [],
     HISTORY_LIMIT: 10,
@@ -137,7 +145,7 @@ function initGame(callback) {
     createGrid();
     initDefoltSettings();
 
-    ysdk.getPlayer().then(_player => {
+    return ysdk.getPlayer().then(_player => {
         game.player = _player;
         return loadCloudSave();
     }).catch(err => {
@@ -160,6 +168,28 @@ function initGame(callback) {
 
         PlayerStatsManager.init();
 
+        document.getElementById("undo-button").addEventListener("click", undoMove);
+        document.getElementById("destroy-button").addEventListener("click", enterDestroyMode);
+        document.getElementById("swap-button").addEventListener("click", enterSwapMode);
+        document.getElementById("ad-button").addEventListener("click", showAdsVideo);
+        document.getElementById("settings-button").addEventListener("click", openSettings);
+
+        document.getElementById("new-game-btn").addEventListener("click", restartGame);
+        document.getElementById("watch-ad-btn").addEventListener("click", showAdsVideo);
+        document.getElementById("toggle-sound-btn").addEventListener("click", toggleSound);
+        document.getElementById("close-settings-btn").addEventListener("click", () => {
+            const content = game.settingsOverlay.querySelector(".settings-content");
+            gsap.to(content, {
+                scale: 0.5,
+                opacity: 0,
+                duration: 0.3,
+                ease: "back.in(1.7)",
+                onComplete: () => {
+                    game.settingsOverlay.classList.add("hidden");
+                    game.isPaused = false;
+                }
+            });
+        });
     });
 }
 
@@ -171,6 +201,31 @@ function loadCloudSave() {
           
             if (state.currency) game.currency = state.currency;
             if (state.bestScore) game.bestScore = state.bestScore;
+            
+            if (state.currentGame) {
+                game.score = state.currentGame.score;
+                game.highestLevelReached = state.currentGame.highestLevelReached;
+
+                for (let r = 0; r < game.gridSize; r++) {
+                    for (let c = 0; c < game.gridSize; c++) {
+                        const cell = state.currentGame.grid[r][c];
+                        if (cell) {
+                            const tile = document.createElement("div");
+                            tile.className = "tile";
+                            tile.innerHTML = `
+                            <div class="tile-inner">
+                                <div class="tile-sprite"></div>
+                                <div class="tile-level"><span>${getLevel(cell.value)}</span></div>
+                            </div>`;
+                            game.grid[r][c] = { el: tile, value: cell.value };
+                            setTilePosition(tile, r, c);
+                            styleTile(tile, cell.value);
+                            setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
+                            game.gridElement.appendChild(tile);
+                        }
+                    }
+                }
+            }
           
         } else {
           
@@ -294,7 +349,7 @@ function move(direction) {
     
     if (!game.isPlaying) return;
   
-    let snapshotBoard = getSnapshotBoard();
+    const snapshotBoard = getSnapshotBoard();
   
     let moved = false;
     const dir = {
@@ -360,6 +415,8 @@ function move(direction) {
             // checkGameOver();
             // saveGameState();
             pushToHistory(snapshotBoard);
+
+            PlayerStatsManager.prepareChanges();
         }, 150);
     }
 }
@@ -618,6 +675,7 @@ function setupInput() {
 function getSnapshotBoard() {
     return {
       score: game.score,
+      highestLevelReached: game.highestLevelReached,
       grid: game.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
     };
 }
@@ -629,8 +687,366 @@ function pushToHistory(snapshot) {
     }
 }
 
-// function getSnapshotState() {
-//     return {
-//         be
-//     }
-// }
+//----------------------------------------
+
+function undoMove() {
+    if (game.destroyMode || game.swapMode) return;
+  
+    const cost = 110;
+    if (game.currency < cost) {
+      alert("Недостаточно монет!");
+      return;
+    }
+  
+    const prev = game.historyStack.pop();
+    if (!prev) return;
+  
+    game.currency -= cost;
+    
+    updateCurrencyDisplay();
+  
+    game.score = prev.score;
+    game.highestLevelReached = prev.highestLevelReached;
+  
+    updateScoreDisplay();
+    updateBestScoreDisplay();
+    updateCurrencyDisplay();
+  
+    game.gridElement.innerHTML = "";
+    game.grid = [];
+    createGrid();
+  
+    for (let r = 0; r < game.gridSize; r++) {
+      for (let c = 0; c < game.gridSize; c++) {
+        const cell = prev.grid[r][c];
+        if (cell) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          tile.innerHTML = `
+            <div class="tile-inner">
+              <div class="tile-sprite"></div>
+              <div class="tile-level"><span>${getLevel(cell.value)}</span></div>
+            </div>`;
+          game.grid[r][c] = { el: tile, value: cell.value };
+          setTilePosition(tile, r, c);
+          styleTile(tile, cell.value);
+          setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
+          game.gridElement.appendChild(tile);
+        }
+      }
+    }
+}
+
+function enterDestroyMode() {
+
+    const cost = 100;
+    if (game.currency < cost) {
+      alert("Недостаточно монет!");
+      return;
+    }
+  
+    game.destroyMode = true;
+    updateHelperPanel("destroy-mode-panel");
+    game.destroyPanel.classList.remove("hidden");
+  
+    setTimeout(() => {
+      document.addEventListener("click", handleDestroyClick);
+    }, 50);
+}
+
+function handleDestroyClick(e) {
+  
+    let isDestroyMode = game.destroyMode;
+    exitDestroyMode();
+  
+    if (!isDestroyMode) return;
+  
+    const tile = e.target.closest(".tile");
+  
+    if (!tile) return;
+  
+    // Поиск координат плитки
+    let r = -1, c = -1;
+    for (let row = 0; row < game.gridSize; row++) {
+      for (let col = 0; col < game.gridSize; col++) {
+        if (game.grid[row][col]?.el === tile) {
+          r = row;
+          c = col;
+          break;
+        }
+      }
+      if (r !== -1) break;
+    }
+  
+    if (r === -1 || c === -1) return;
+  
+    // Подсчёт количества плиток на поле
+    let tileCount = 0;
+    for (let row = 0; row < game.gridSize; row++) {
+      for (let col = 0; col < game.gridSize; col++) {
+        if (game.grid[row][col]) tileCount++;
+      }
+    }
+  
+    // Если осталась только одна плитка — запретить уничтожение
+    if (tileCount <= 1) {
+      // alert("Нельзя уничтожить последнюю плитку!");
+      return;
+    }
+  
+    const cost = 100;
+    game.currency -= cost;
+    // Storage.save("currency", currency);
+    updateCurrencyDisplay();
+  
+    pushToHistory(getSnapshotBoard());
+  
+    // Получаем координаты с учётом transform
+    const originalTransform = tile.style.transform;
+    tile.style.transform = "none";
+    const rect = tile.getBoundingClientRect();
+    tile.style.transform = originalTransform;
+  
+    const parentRect = game.gridElement.getBoundingClientRect();
+    const x = rect.left - parentRect.left;
+    const y = rect.top - parentRect.top;
+  
+    // позиционируем в центре плитки
+    const tileRect = tile.getBoundingClientRect();
+    const centerX = tileRect.top + tileRect.width / 2;
+    const centerY = tileRect.left + tileRect.height / 2;
+  
+    // Частицы
+    for (let i = 0; i < 15; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      document.body.appendChild(p);
+      
+      p.style.top = centerX + 'px';
+      p.style.left = centerY + 'px';
+  
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 40 + Math.random() * 40;
+      const dx = Math.cos(angle) * distance;
+      const dy = Math.sin(angle) * distance;
+  
+      gsap.to(p, {
+        x: dx,
+        y: dy,
+        opacity: 0,
+        scale: 0.5 + Math.random(),
+        duration: 0.8,
+        ease: "power2.out",
+        onComplete: () => p.remove()
+      });
+    }
+    
+    // Вспышка
+    gsap.fromTo(tile,
+      { opacity: 0, scale: 0.5 },
+      { opacity: 1, scale: 1.2, duration: 0.1, ease: "power2.out",
+        onComplete: () => {
+          gsap.to(tile, {
+            opacity: 0,
+            scale: 1.1,
+            duration: 0.7,
+            ease: "power3.in",
+            onComplete: () => {
+              destroyTile(tile, r, c);
+            }
+          });
+        }
+      }
+    );
+  
+    // Тряска
+    gsap.fromTo(tile, 
+      { x: x - 30 }, 
+      { x: x + 30, yoyo: true, repeat: 5, duration: 0.04, ease: "power1.inOut", onComplete: () => {
+        gsap.to(tile, { x: x, duration: 0.05 });
+      }}
+    );
+  
+}
+
+function destroyTile(tileElement, r, c) {
+    game.gridElement.removeChild(tileElement);
+    game.grid[r][c] = null;
+    PlayerStatsManager.prepareChanges();
+}
+
+function exitDestroyMode() {
+    game.destroyMode = false;
+    game.destroyPanel.classList.add("hidden");
+    document.removeEventListener("click", handleDestroyClick);
+}
+
+function updateHelperPanel(panelId) {
+    const helperNumber = Math.floor(Math.random() * 8) + 1;
+  
+    const panel = document.getElementById(panelId);
+    const img = panel.querySelector(".helper-img");
+  
+    const path = `images/helper_${helperNumber}.png`;
+    const cachedImage = game.preloaderImages[path];
+    if (game.cachedImage && img) {
+        img.src = game.cachedImage.src;
+    }
+}
+
+function enterSwapMode() {
+
+    const cost = 120;
+
+    if (game.swapMode) {
+      // Если режим уже активен — сбрасываем всё
+      exitSwapMode();
+      return;
+    }
+    
+    if (game.currency < cost) {
+      alert("Недостаточно монет!");
+      return;
+    }
+  
+    game.swapMode = true;
+    game.selectedTiles = [];
+    game.swapPanel.classList.remove("hidden");
+  
+    setTimeout(() => {
+      document.addEventListener("click", handleSwapClick);
+    }, 50);
+}
+
+function openSettings() {
+    game.isPaused = true;
+    const randomHelper = Math.floor(Math.random() * 8) + 1;
+    const img = game.settingsOverlay.querySelector(".settings-cat");
+    const path = `images/helper_${randomHelper}.png`;
+    const cachedImage = game.preloaderImages[path];
+    if (cachedImage && img) {
+        img.src = cachedImage.src;
+    }
+    const content = game.settingsOverlay.querySelector(".settings-content");
+    game.settingsOverlay.classList.remove("hidden");
+    gsap.fromTo(content, 
+        { scale: 0.5, opacity: 0 }, 
+        { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.7)" }
+    );
+}
+
+function exitSwapMode() {
+    game.swapMode = false;
+    game.swapPanel.classList.add("hidden");
+    document.removeEventListener("click", handleSwapClick);
+  
+    // Убираем подсветку
+    game.selectedTiles.forEach(tile => {
+        const el = game.grid[tile.r][tile.c].el;
+        el.classList.remove("selected")
+    });
+    game.selectedTiles = [];
+}
+
+function handleSwapClick(e) {
+    const tile = e.target.closest(".tile");
+    if (!tile) {
+        exitSwapMode();
+        return;
+    }
+  
+    // Определяем координаты плитки
+    let r = -1, c = -1;
+    for (let row = 0; row < game.gridSize; row++) {
+      for (let col = 0; col < game.gridSize; col++) {
+        if (game.grid[row][col]?.el === tile) {
+          r = row;
+          c = col;
+          break;
+        }
+      }
+      if (r !== -1) break;
+    }
+  
+    if (r === -1 || c === -1) return;
+  
+    // Проверка: уже выбрана эта же плитка?
+    if (game.selectedTiles.some(t => t.r === r && t.c === c)) return;
+  
+    game.selectedTiles.push({ r, c });
+    tile.classList.add("selected");
+  
+    if (game.selectedTiles.length === 2) {
+  
+        const cost = 120;
+        game.currency -= cost;
+        updateCurrencyDisplay();
+
+        pushToHistory(getSnapshotBoard());
+
+        const [first, second] = game.selectedTiles;
+        const tileA = game.grid[first.r][first.c];
+        const tileB = game.grid[second.r][second.c];
+
+        if (!tileA || !tileB) return;
+
+        const elA = tileA.el;
+        const elB = tileB.el;
+
+        const posA = { x: first.c * game.cellSize + game.gap, y: first.r * game.cellSize + game.gap };
+        const posB = { x: second.c * game.cellSize + game.gap, y: second.r * game.cellSize + game.gap };
+
+        gsap.to(elA, {
+            x: posB.x + 'vmin',
+            y: posB.y + 'vmin',
+            duration: 0.3,
+            onComplete: () => setTilePosition(elA, second.r, second.c)
+        });
+
+        gsap.to(elB, {
+            x: posA.x + 'vmin',
+            y: posA.y + 'vmin',
+            duration: 0.3,
+            onComplete: () => setTilePosition(elB, first.r, first.c)
+        });
+
+        // Обновляем grid
+        [game.grid[first.r][first.c], game.grid[second.r][second.c]] = [tileB, tileA];
+
+        elA.classList.remove("selected");
+        elB.classList.remove("selected");
+
+        game.selectedTiles = [];
+        exitSwapMode();
+        PlayerStatsManager.prepareChanges();
+    }
+}
+
+function showAdsVideo() {
+    const cost = 115;
+    game.currency += cost;
+    updateCurrencyDisplay();
+    PlayerStatsManager.prepareChanges();
+}
+
+function restartGame() {
+
+}
+
+function toggleSound() {
+    
+    game.isSoundOn = !game.isSoundOn;
+
+    localStorage.setItem("sound", game.isSoundOn); // сохраним настройку
+    
+    const soundText = document.getElementById("sound-text");
+    soundText.textContent = game.isSoundOn ? "Звук: Вкл" : "Звук: Выкл";
+    const soundIcon = document.getElementById("sound-icon");
+    soundIcon.src = game.isSoundOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
+  
+    if (game.isSoundOn && game.musicReady) {
+        game.bgMusic.play();
+    } else {
+        game.bgMusic.pause();
+    }
+}
