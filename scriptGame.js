@@ -129,6 +129,10 @@ const game = {
     colorCache: {},
     predefinedTileColors: {},
     randomLevelUpPhrases: [],
+    randomNoCurrencyPhrases: [],
+
+    lastAdTimestamp: 0,
+    lastInteractionTime: null,
 
 };
 
@@ -142,6 +146,12 @@ window.addEventListener("load", () => {
 
           checkDailyReward();
           PlayerStatsManager.prepareChanges();
+          tryShowSmartAd("startup");
+
+          setInterval(() => {
+            tryShowSmartAd("auto");
+          }, 30000);
+
         });
       });
       
@@ -155,7 +165,10 @@ function initGame(callback) {
 
     createGrid();
     initDefoltSettings();
+
     game.isSoundOn = localStorage.getItem("sound") !== "false";
+    game.lastAdTimestamp = Number(localStorage.getItem("lastAdTimestamp") || 0);
+
     updateLabelSound();
     
     return ysdk.getPlayer().then(_player => {
@@ -325,6 +338,15 @@ function initDefoltSettings() {
         "Ты точно знаешь, как обращаться с пушистыми цифрами!",
     ];
     
+    game.randomNoCurrencyPhrases = [
+      "Мяу... Котику не хватает самоцветов!",
+      "Эй! Самоцветы закончились 🥺",
+      "Хочешь продолжить? Котик будет рад самоцветам!",
+      "Пора бы пополнить кошачий запас блестяшек!",
+      "Котик грустит без самоцветов...",
+      "Без самоцветов даже мурчать не хочется...",
+    ];
+
     game.bestScore = 0;
     game.score = 0;
     game.currency = 0;
@@ -336,6 +358,8 @@ function initDefoltSettings() {
     game.musicReady = false;
     game.musicStarted = false;
     game.lastClaimDate = new Date();
+    game.lastAdTimestamp = 0;
+    game.lastInteractionTime = null;
 }
 
 function startGame() {
@@ -471,14 +495,66 @@ function move(direction) {
     if (moved) {
         setTimeout(() => {
             spawnTile();
-            // checkGameOver();
-            // saveGameState();
             pushToHistory(snapshotBoard);
-
+            
             PlayerStatsManager.prepareChanges();
+            
+            checkGameOver();
         }, 150);
+    } else {
+      checkGameOver();
     }
 }
+
+function checkGameOver() {
+  for (let r = 0; r < game.gridSize; r++) {
+    for (let c = 0; c < game.gridSize; c++) {
+      if (!game.grid[r][c]) return false;
+      const val = game.grid[r][c].value;
+      if (
+        (r > 0 && game.grid[r - 1][c]?.value === val) ||
+        (r < game.gridSize - 1 && game.grid[r + 1][c]?.value === val) ||
+        (c > 0 && game.grid[r][c - 1]?.value === val) ||
+        (c < game.gridSize - 1 && game.grid[r][c + 1]?.value === val)
+      ) {
+        return false;
+      }
+    }
+  }
+  showGameOverOverlay();
+  return true;
+}
+
+function showGameOverOverlay() {
+  const overlay = document.getElementById("game-over-overlay");
+  overlay.classList.remove("hidden");
+  game.isPaused = true;
+
+  document.getElementById("go-destroy").onclick = () => {
+    overlay.classList.add("hidden");
+    game.isPaused = false;
+    enterDestroyMode();
+  };
+
+  document.getElementById("go-swap").onclick = () => {
+    overlay.classList.add("hidden");
+    game.isPaused = false;
+    enterSwapMode();
+  };
+
+  document.getElementById("go-watch-ad").onclick = () => {
+    overlay.classList.add("hidden");
+    game.isPaused = false;
+    showAdsVideo("game");
+  };
+
+  document.getElementById("go-restart").onclick = () => {
+    overlay.classList.add("hidden");
+    game.isPaused = false;
+    restartGame();
+  };
+}
+
 
 function spawnTile() {
     const empty = [];
@@ -507,7 +583,7 @@ function spawnTile() {
 
 function checkWin(value) {
     const level = getLevel(value);
-    if (level >= 4 && level > game.highestLevelReached) {
+    if (level >= 5 && level > game.highestLevelReached) {
         game.highestLevelReached = level;
         showLevelUpPopup(level);
     }
@@ -736,6 +812,13 @@ function setupInput() {
         }
       }
     }, { passive: false });
+
+    ["click", "keydown", "touchstart"].forEach(event => {
+      document.addEventListener(event, () => {
+        game.lastInteractionTime = Date.now();
+      });
+    });
+
 }
 
 function tryStartMusic() {
@@ -800,7 +883,7 @@ function undoMove() {
   
     const cost = 110;
     if (game.currency < cost) {
-      alert("Недостаточно монет!");
+      showNoCurrencyOverlay();
       return;
     }
   
@@ -839,13 +922,15 @@ function undoMove() {
         }
       }
     }
+
+    PlayerStatsManager.prepareChanges();
 }
 
 function enterDestroyMode() {
 
     const cost = 100;
     if (game.currency < cost) {
-      alert("Недостаточно монет!");
+      showNoCurrencyOverlay();
       return;
     }
   
@@ -1009,7 +1094,7 @@ function enterSwapMode() {
     }
     
     if (game.currency < cost) {
-      alert("Недостаточно монет!");
+      showNoCurrencyOverlay();
       return;
     }
   
@@ -1127,20 +1212,40 @@ function handleSwapClick(e) {
 }
 
 function showAdsVideo(source = "game") {
-    
+
   const rewardAmount = 115;
-  
-  showRewardPopup(
-    `🎉 Вы получили +${rewardAmount} самоцветов!`,
-    () => {
-      game.currency += rewardAmount;
-      updateCurrencyDisplay();
-      PlayerStatsManager.prepareChanges();
-    });
 
   if (source === "settings") {
     closeSettingsOverlay();
   }
+
+  ysdk.adv.showRewardedVideo({
+    callbacks: {
+        onOpen: () => {
+          console.log('Video ad open.');
+        },
+        onRewarded: () => {
+
+          game.currency += rewardAmount;
+
+          showRewardPopup(
+            `🎉 Вы получили <span class="reward-amount">+${rewardAmount}</span> самоцветов!`,
+            () => {
+              updateCurrencyDisplay();
+              PlayerStatsManager.prepareChanges();
+          });
+
+          console.log('Rewarded!');
+        },
+        onClose: () => {
+          console.log('Video ad closed.');
+        },
+        onError: (e) => {
+          console.log('Error while open video ad:', e);
+        }
+    }
+  })
+
 }
 
 function restartGame() {
@@ -1169,6 +1274,7 @@ function restartGame() {
 
     
     closeSettingsOverlay();
+    tryShowSmartAd("newgame");
 }
 
 function toggleSound() {
@@ -1204,7 +1310,7 @@ function checkDailyReward() {
     
     // Показываем всплывающее окно
     showRewardPopup(
-      `🎁 Ежедневная награда: +${rewardAmount} самоцветов!`,
+      `🎁 Ежедневная награда: <span class="reward-amount">+${rewardAmount}</span> самоцветов!`,
       () => {
         // Даем награду
         game.currency += rewardAmount;
@@ -1237,4 +1343,80 @@ function showRewardPopup(message, callback) {
           }, 2500);
       }
   });
+}
+
+function tryShowSmartAd(trigger = "auto") {
+  const now = Date.now();
+  const minutes5 = 5 * 60 * 1000;
+
+  const enoughTimePassed = now - game.lastAdTimestamp >= minutes5;
+
+  if (!enoughTimePassed) return;
+
+  const playerIdle = now - game.lastInteractionTime >= 5000;
+
+  const isAuto = trigger === "auto";
+  const isStartup = trigger === "startup";
+  const isNewGame = trigger === "newgame";
+
+  if (isStartup || isNewGame || (isAuto && playerIdle)) {
+    showFullscreenAd();
+    game.lastAdTimestamp = now;
+    localStorage.setItem("lastAdTimestamp", now.toString());
+  }
+}
+
+function showFullscreenAd(callbackAfterAd = null) {
+  if (!ysdk?.adv) return;
+
+  ysdk.adv.showFullscreenAdv({
+    callbacks: {
+      onOpen: () => {
+        console.log("📺 Реклама открыта");
+      },
+      onClose: (wasShown) => {
+        console.log("📺 Закрыта. Показана:", wasShown);
+        if (callbackAfterAd) callbackAfterAd?.();
+      },
+      onError: (e) => {
+        console.error("❌ Ошибка рекламы:", e);
+        if (callbackAfterAd) callbackAfterAd?.();
+      }
+    }
+  });
+}
+
+function showNoCurrencyOverlay() {
+
+  const phrases = game.randomNoCurrencyPhrases;
+  const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+  document.getElementById("no-currency-text").textContent = phrase;
+
+  const overlay = document.getElementById("no-currency-overlay");
+  const cat = document.getElementById("no-currency-cat");
+
+  const helperNumber = Math.floor(Math.random() * 8) + 1;
+  const path = `images/helper_${helperNumber}.png`;
+  const cachedImage = game.preloaderImages[path];
+  if (cachedImage && cat) cat.src = cachedImage.src;
+
+  const content = overlay.querySelector(".settings-content");
+  gsap.fromTo(content, 
+    { scale: 0.5, opacity: 0 }, 
+    { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.7)" }
+  );
+
+  overlay.classList.remove("hidden");
+  game.isPaused = true;
+
+  document.getElementById("no-currency-close").onclick = () => {
+    overlay.classList.add("hidden");
+    game.isPaused = false;
+  };
+
+  document.getElementById("no-currency-watch-ad").onclick = () => {
+    overlay.classList.add("hidden");
+    game.isPaused = false;
+    showAdsVideo("settings"); // или "settings", если нужно
+  };
 }

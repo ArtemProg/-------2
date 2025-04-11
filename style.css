@@ -632,3 +632,9 @@ body::-webkit-scrollbar {
   height: 2vmin;
   margin-right: 0.5vmin;
 }
+
+.reward-amount {
+  color: #ff4d4d;
+  font-weight: bold;
+  text-shadow: 0 0 1vmin rgba(255, 0, 0, 0.4);
+}

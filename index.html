@@ -58,12 +58,35 @@
       <img src="images/helper_1.png" class="helper-img">
       <p>Выберите две плитки по очереди, чтобы поменять их местами</p>
     </div>
-    <div class="overlay hidden" id="overlay">
-      <div class="overlay-content">
-        <h1 id="overlay-title">Ты победил!</h1>
-        <p id="overlay-subtitle">Ты достиг уровня 4!</p>
-        <button id="restart-button">ИГРАТЬ СНОВА</button>
+    
+    <div id="game-over-overlay" class="overlay hidden">
+      <div class="settings-content">
+        <img src="images/helper_3.png" class="settings-cat" />
+        <p class="gradient-text" style="font-size: 6vmin;">Игра окончена</p>
+        <p style="font-size: 4.5vmin; color: white; line-height: 1.2;">Но ты можешь продолжить!</p>
+        
+        <button id="go-destroy">
+          <img src="images/icon_remove.png" />
+          <span class="gradient-text">Разбить плитку</span>
+        </button>
+    
+        <button id="go-swap">
+          <img src="images/icon_swap.png" />
+          <span class="gradient-text">Поменять местами</span>
+        </button>
+    
+        <button id="go-watch-ad">
+          <img src="images/icon_ads.png" />
+          <span class="gradient-text">Посмотреть рекламу</span>
+        </button>
+    
+        <button id="go-restart">
+          <img src="images/icon_restart.png" />
+          <span class="gradient-text">Начать заново</span>
+        </button>
       </div>
+    </div>
+
     </div>
     <div class="level-up-popup hidden" id="level-up-popup">
       <img id="level-up-img" src="images/helper_1.png" >
@@ -90,6 +113,22 @@
         </button>
       </div>
     </div>
+
+    <div id="no-currency-overlay" class="overlay hidden">
+      <div class="settings-content">
+        <img src="images/helper_1.png" id="no-currency-cat" class="settings-cat" />
+        <p id="no-currency-text" style="font-size: 5vmin; color: white;">Котику не хватает самоцветов...</p>
+        <button id="no-currency-watch-ad">
+          <img src="images/icon_ads.png" />
+          <span class="gradient-text">Получить самоцветы</span>
+        </button>
+        <button id="no-currency-close">
+          <img src="images/icon_close.png" />
+          <span class="gradient-text">Закрыть</span>
+        </button>
+      </div>
+    </div>
+
   </div>
   <audio id="bg-music" preload="auto" loop>
     <source src="sound/music.m4a" type="audio/mp4">
