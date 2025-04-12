@@ -5,6 +5,8 @@ const PlayerStatsManager = {
     saveTimeout: null,
     lastSaveTime: 0,
     SAVE_DELAY: 5000, // минимальная задержка между запросами в мс
+    lastSubmitTime: 0,
+    SUBMIT_DELAY: 1000, // 1 секунда
   
     init() {
         // Подписка на событие "вкладка скрыта"
@@ -78,7 +80,49 @@ const PlayerStatsManager = {
         if (Object.keys(this.pendingStats).length > 0) {
           this.save();
         }
-    }
+    },
+
+    trySubmitScore(score) {
+      ysdk.getPlayer().then(player => {
+        // Проверяем, авторизован ли игрок
+        if (player.getMode() === 'lite') {
+          // console.log('Игрок не авторизован. Запрашиваем авторизацию...');
+          // ysdk.auth.openAuthDialog().then(() => {
+          //   console.log('Игрок авторизован после диалога');
+          //   submitScore(score); // Отправляем очки
+          // }).catch(() => {
+          //   console.warn('Игрок отказался от авторизации. Очки не будут отправлены.');
+          // });
+        } else {
+          console.log('Игрок уже авторизован');
+          this.submitScore(score);
+        }
+      }).catch(err => {
+        console.error('Ошибка получения игрока:', err);
+      });
+    },
+
+    submitScore(score) {
+      const now = Date.now();
+    
+      if (now - this.lastSubmitTime < this.SUBMIT_DELAY) {
+        console.warn("⚠️ Слишком частая отправка очков. Подожди немного.");
+        return;
+      }
+    
+      this.lastSubmitTime = now;
+    
+      ysdk.getLeaderboards().then(lb => {
+        lb.setLeaderboardScore('lbBestScore', score).then(() => {
+          console.log('✅ Очки отправлены в лидерборд');
+        }).catch(err => {
+          console.error('❌ Ошибка при отправке очков:', err);
+        });
+      }).catch(err => {
+        console.error('❌ Ошибка при получении лидерборда:', err);
+      });
+    },
+
 };
 
 
@@ -196,7 +240,7 @@ function initGame(callback) {
                 spawnTile();
             }, 200);
             if (!game.hasEnteredBefore) {
-                game.currency = 400;
+                game.currency = 2000;
                 game.hasEnteredBefore = true;
             }
         }
@@ -779,6 +823,7 @@ function addScore(points) {
         game.bestScore = game.score;
         //Storage.save("bestScore", bestScore);
         updateBestScoreDisplay();
+        PlayerStatsManager.trySubmitScore(game.bestScore);
     }
 }
 
@@ -822,11 +867,23 @@ function setupInput() {
 }
 
 function tryStartMusic() {
+  const audio = game.bgMusic;
+
+  // проверка, если уже загружается/играет — ничего не делать
+    if (audio && !audio.dataset.initialized) {
+      // пометить как инициализированное
+      audio.dataset.initialized = true;
+      audio.load();
+      return;
+    };
+
     if (game.musicReady && !game.musicStarted && game.isSoundOn) {
-        game.bgMusic.volume = 0.2;
-        game.bgMusic.loop = true;
-    
-        game.bgMusic.play().then(() => {
+      
+
+        audio.volume = 0.2;
+        audio.loop = true;
+
+        audio.play().then(() => {
             console.log("Музыка играет!");
             game.musicStarted = true;
         }).catch(err => {
@@ -1213,7 +1270,7 @@ function handleSwapClick(e) {
 
 function showAdsVideo(source = "game") {
 
-  const rewardAmount = 115;
+  const rewardAmount = 400;
 
   if (source === "settings") {
     closeSettingsOverlay();

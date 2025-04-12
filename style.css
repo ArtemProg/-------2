@@ -11,7 +11,7 @@
 }
 
 body {
-  background: linear-gradient(160deg, #fff9e5, #ffdca8);
+  background: linear-gradient(160deg, #89c2d9, #468faf);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -637,4 +637,9 @@ body::-webkit-scrollbar {
   color: #ff4d4d;
   font-weight: bold;
   text-shadow: 0 0 1vmin rgba(255, 0, 0, 0.4);
+}
+
+#game-over-overlay p,
+#game-over-overlay img {
+  margin: 0;
 }
