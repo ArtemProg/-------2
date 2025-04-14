@@ -193,7 +193,6 @@ window.addEventListener("load", () => {
       game.currentLang = game.lang && game.langs.includes(game.lang) 
         ? game.lang
         : game.langs.includes[0];
-        game.currentLang = "en"; //sloa
 
       loadingResources(() => {
         updateLangTexts();
