@@ -178,14 +178,25 @@ const game = {
     lastAdTimestamp: 0,
     lastInteractionTime: null,
 
+    lang: null,
+    langs: ["ru", "en"],
+    currentLang: "ru",
+    translations: {},
+
 };
 
 window.addEventListener("load", () => {
     YaGames.init().then(sdk => {
       ysdk = sdk;
   
+      game.lang = ysdk.environment.i18n.lang;
+      game.currentLang = game.lang && game.langs.includes(game.lang) 
+        ? game.lang
+        : game.langs.includes[0];
+        game.currentLang = "en"; //sloa
 
       loadingResources(() => {
+        updateLangTexts();
         initGame(() => {
 
           checkDailyReward();
@@ -208,7 +219,7 @@ window.addEventListener("load", () => {
 function initGame(callback) {
 
     createGrid();
-    initDefoltSettings();
+    initDefaultSettings();
 
     game.isSoundOn = localStorage.getItem("sound") !== "false";
     game.lastAdTimestamp = Number(localStorage.getItem("lastAdTimestamp") || 0);
@@ -240,7 +251,7 @@ function initGame(callback) {
                 spawnTile();
             }, 200);
             if (!game.hasEnteredBefore) {
-                game.currency = 2000;
+                game.currency = 100;
                 game.hasEnteredBefore = true;
             }
         }
@@ -349,7 +360,7 @@ function loadCloudSave() {
 
 }
 
-function initDefoltSettings() {
+function initDefaultSettings() {
     
     game.predefinedTileColors = {
         1: ['#eee4da', '#776e65'],     // 2
@@ -368,28 +379,6 @@ function initDefoltSettings() {
         14: ['#a97142', '#f9f6f2'],     // 16384
         15: ['#8b4513', '#f9f6f2'],     // 32768
     };
-
-    game.randomLevelUpPhrases = [
-        "Кот доволен твоим прогрессом!",
-        "Ты приближаешься к хвостатой легенде!",
-        "Мяу! Ты просто чудо!",
-        "Кажется, у этого кота девять жизней — и все в прокачке!",
-        "Котик лайкнул твой уровень!",
-        "Ты кото-богат!",
-        "Шаг за шагом — к усатой вершине!",
-        "Вот это кот-комбо!",
-        "У тебя лапы растут откуда надо!",
-        "Ты точно знаешь, как обращаться с пушистыми цифрами!",
-    ];
-    
-    game.randomNoCurrencyPhrases = [
-      "Мяу... Котику не хватает самоцветов!",
-      "Эй! Самоцветы закончились 🥺",
-      "Хочешь продолжить? Котик будет рад самоцветам!",
-      "Пора бы пополнить кошачий запас блестяшек!",
-      "Котик грустит без самоцветов...",
-      "Без самоцветов даже мурчать не хочется...",
-    ];
 
     game.bestScore = 0;
     game.score = 0;
@@ -489,6 +478,7 @@ function move(direction) {
     const range = [...Array(game.gridSize).keys()];
     const iterate = (dir.x > 0 || dir.y > 0) ? range.reverse() : range;
     const merged = Array.from({ length: game.gridSize }, () => Array(game.gridSize).fill(false));
+    let currency = 0;
     for (let r of iterate) {
       for (let c of iterate) {
         const cell = game.grid[r][c];
@@ -515,20 +505,21 @@ function move(direction) {
           if (toCell) {
             const toTile = toCell.el;
             const newValue = toCell.value * 2;
+            currency += getLevel(toCell.value);
             game.grid[r][c] = null;
             setTimeout(() => {
-            game.gridElement.removeChild(fromTile);
-            toCell.value = newValue;
-            toTile.innerHTML = `
-                <div class="tile-inner pop">
-                <div class="tile-sprite"></div>
-                <div class="tile-level"><span>${getLevel(newValue)}</span></div>
-                </div>`;
-            styleTile(toTile, newValue);
-            setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
-            addScore(newValue);
-            checkWin(newValue);
-            }, 150);
+              game.gridElement.removeChild(fromTile);
+              toCell.value = newValue;
+              toTile.innerHTML = `
+                  <div class="tile-inner pop">
+                    <div class="tile-sprite"></div>
+                    <div class="tile-level"><span>${getLevel(newValue)}</span></div>
+                  </div>`;
+              styleTile(toTile, newValue);
+              setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
+              addScore(newValue);
+              checkWin(newValue);
+              }, 150);
           } else {
             game.grid[nr][nc] = cell;
             game.grid[r][c] = null;
@@ -538,11 +529,11 @@ function move(direction) {
     }
     if (moved) {
         setTimeout(() => {
+            game.currency += currency;
+            updateCurrencyDisplay();
             spawnTile();
             pushToHistory(snapshotBoard);
-            
             PlayerStatsManager.prepareChanges();
-            
             checkGameOver();
         }, 150);
     } else {
@@ -636,7 +627,7 @@ function checkWin(value) {
 // createGrid
 
 function createGrid() {
-
+  
     for (let r = 0; r < game.gridSize; r++) {
         game.grid[r] = [];
       for (let c = 0; c < game.gridSize; c++) {
@@ -740,10 +731,15 @@ function styleTile(tile, value) {
 
 function setTileSprite(spriteElement, value) {
     const level = getLevel(value);
-    const maxLevel = 15;
-    const clamped = Math.min(level, maxLevel);
-  
-    const path = `images/img_${clamped}.png`;
+    
+    let path;
+    if (level >= 34) {
+        const helperIndex = ((level - 34) % 8) + 1;
+        path = `images/helper_${helperIndex}.png`;
+    } else {
+        const clamped = Math.min(level, 34);
+        path = `images/set2/img_${clamped}.png`;
+    }
     const cachedImage = game.preloaderImages[path];
     if (cachedImage && spriteElement) {
         spriteElement.style.backgroundImage = `url('${cachedImage.src}')`;
@@ -759,15 +755,22 @@ function getRandomLevelUpPhrase() {
 function loadingResources(callback) {
 
     let imagePaths = [];
-    for(let i = 1; i < 16; i++) {
-        imagePaths.push(`images/img_${i}.png`)
+    for(let i = 1; i <= 34; i++) {
+        imagePaths.push(`images/set2/img_${i}.png`)
     }
     for(let i = 1; i < 9; i++) {
         imagePaths.push(`images/helper_${i}.png`)
     }
 
     preloadImages(imagePaths, () => {
+       
+      fetch(`lang/${game.currentLang}.json`)
+      .then(response => response.json())
+      .then(translations => {
+        game.translations = translations;
         callback();
+      });
+      
     });
 
 }
@@ -985,19 +988,27 @@ function undoMove() {
 
 function enterDestroyMode() {
 
-    const cost = 100;
-    if (game.currency < cost) {
-      showNoCurrencyOverlay();
-      return;
-    }
+  if (game.destroyMode) {
+    exitDestroyMode();
+    return;
+  } else if (game.swapMode) {
+    exitSwapMode();
+    return;
+  }
+
+  const cost = 100;
+  if (game.currency < cost) {
+    showNoCurrencyOverlay();
+    return;
+  }
   
-    game.destroyMode = true;
-    updateHelperPanel("destroy-mode-panel");
-    game.destroyPanel.classList.remove("hidden");
-  
-    setTimeout(() => {
-      document.addEventListener("click", handleDestroyClick);
-    }, 50);
+  game.destroyMode = true;
+  updateHelperPanel("destroy-mode-panel");
+  game.destroyPanel.classList.remove("hidden");
+
+  setTimeout(() => {
+    document.addEventListener("click", handleDestroyClick);
+  }, 50);
 }
 
 function handleDestroyClick(e) {
@@ -1141,27 +1152,29 @@ function updateHelperPanel(panelId) {
 }
 
 function enterSwapMode() {
-
-    const cost = 120;
-
-    if (game.swapMode) {
-      // Если режим уже активен — сбрасываем всё
-      exitSwapMode();
-      return;
-    }
-    
-    if (game.currency < cost) {
-      showNoCurrencyOverlay();
-      return;
-    }
   
-    game.swapMode = true;
-    game.selectedTiles = [];
-    game.swapPanel.classList.remove("hidden");
+  if (game.destroyMode) {
+    exitDestroyMode();
+    return;
+  } else if (game.swapMode) {
+    exitSwapMode();
+    return;
+  }
+
+  const cost = 120;
   
-    setTimeout(() => {
-      document.addEventListener("click", handleSwapClick);
-    }, 50);
+  if (game.currency < cost) {
+    showNoCurrencyOverlay();
+    return;
+  }
+
+  game.swapMode = true;
+  game.selectedTiles = [];
+  game.swapPanel.classList.remove("hidden");
+
+  setTimeout(() => {
+    document.addEventListener("click", handleSwapClick);
+  }, 50);
 }
 
 function openSettings() {
@@ -1270,7 +1283,7 @@ function handleSwapClick(e) {
 
 function showAdsVideo(source = "game") {
 
-  const rewardAmount = 400;
+  const rewardAmount = 415;
 
   if (source === "settings") {
     closeSettingsOverlay();
@@ -1290,12 +1303,18 @@ function showAdsVideo(source = "game") {
             () => {
               updateCurrencyDisplay();
               PlayerStatsManager.prepareChanges();
+              setTimeout(() => {
+                syncTileSizeWithCell();
+              }, 150);
           });
 
           console.log('Rewarded!');
         },
         onClose: () => {
           console.log('Video ad closed.');
+          setTimeout(() => {
+            syncTileSizeWithCell();
+          }, 150);
         },
         onError: (e) => {
           console.log('Error while open video ad:', e);
@@ -1303,6 +1322,50 @@ function showAdsVideo(source = "game") {
     }
   })
 
+}
+
+function t(key, params = {}) {
+  let text = game.translations[key] || key;
+  for (const param in params) {
+    text = text.replaceAll(`{${param}}`, params[param]);
+  }
+  return text;
+}
+
+function updateLangTexts() {
+
+  document.getElementById("ad-button").title = t("getGems");
+  document.getElementById("undo-button").title = t("undo");
+  document.getElementById("destroy-button").title = t("destroy");
+  document.getElementById("swap-button").title = t("swap");
+  document.getElementById("settings-button").title = t("settings");
+
+  
+  document.getElementById("new-game-btn").querySelector('span').textContent = t("newGame");
+  document.getElementById("watch-ad-btn").querySelector('span').textContent = t("getGems");
+  document.getElementById("toggle-sound-btn").querySelector('span').textContent = t("sound");
+  document.getElementById("close-settings-btn").querySelector('span').textContent = t("continue");
+  
+  document.getElementById("go-destroy").querySelector('span').textContent = t("destroy");
+  document.getElementById("go-swap").querySelector('span').textContent = t("swap");
+  document.getElementById("go-watch-ad").querySelector('span').textContent = t("getGems");
+  document.getElementById("go-restart").querySelector('span').textContent = t("newGame");
+
+  document.getElementById("title-game-over-1").textContent = t("title-game-over-1");
+  document.getElementById("title-game-over-2").textContent = t("title-game-over-2");
+
+  game.randomNoCurrencyPhrases = t("randomNoCurrencyPhrases");
+  game.randomLevelUpPhrases = t("randomLevelUpPhrases");
+
+  document.getElementById("no-currency-watch-ad").querySelector('span').textContent = t("getGems");
+  document.getElementById("no-currency-close").querySelector('span').textContent = t("continue");
+
+  game.destroyPanel.querySelector('p').textContent = t("destroyInstruction");
+  game.swapPanel.querySelector('p').textContent = t("swapInstruction");
+  // document.getElementById("toggle-sound-btn").querySelector('span').textContent = t("sound");
+  // document.getElementById("close-settings-btn").querySelector('span').textContent = t("continue");
+  // document.getElementById("no-currency-text").textContent = t("notEnoughGems");
+  // и т.д.
 }
 
 function restartGame() {
@@ -1351,7 +1414,7 @@ function toggleSound() {
 
 function updateLabelSound() {
     const soundText = document.getElementById("sound-text");
-    soundText.textContent = game.isSoundOn ? "Звук: Вкл" : "Звук: Выкл";
+    soundText.textContent = game.isSoundOn ? t("soundOn") : t("soundOff");
 
     const soundIcon = document.getElementById("sound-icon");
     soundIcon.src = game.isSoundOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
@@ -1363,11 +1426,12 @@ function checkDailyReward() {
 
   if (!game.lastDailyReward || game.lastDailyReward.toDateString() !== today) {
     
-    const rewardAmount = 95;
+    const rewardAmount = 395;
+    const text = t("dailyReward", { amount: rewardAmount });
     
     // Показываем всплывающее окно
     showRewardPopup(
-      `🎁 Ежедневная награда: <span class="reward-amount">+${rewardAmount}</span> самоцветов!`,
+      text,
       () => {
         // Даем награду
         game.currency += rewardAmount;
@@ -1410,13 +1474,13 @@ function tryShowSmartAd(trigger = "auto") {
 
   if (!enoughTimePassed) return;
 
-  const playerIdle = now - game.lastInteractionTime >= 5000;
+  //const playerIdle = now - game.lastInteractionTime >= 5000;
 
   const isAuto = trigger === "auto";
   const isStartup = trigger === "startup";
   const isNewGame = trigger === "newgame";
 
-  if (isStartup || isNewGame || (isAuto && playerIdle)) {
+  if (isStartup || isNewGame || isAuto) {
     showFullscreenAd();
     game.lastAdTimestamp = now;
     localStorage.setItem("lastAdTimestamp", now.toString());
@@ -1433,6 +1497,12 @@ function showFullscreenAd(callbackAfterAd = null) {
       },
       onClose: (wasShown) => {
         console.log("📺 Закрыта. Показана:", wasShown);
+        if (wasShown) {
+          game.lastAdTimestamp = Date.now();
+          setTimeout(() => {
+            syncTileSizeWithCell();
+          }, 150);
+        }
         if (callbackAfterAd) callbackAfterAd?.();
       },
       onError: (e) => {

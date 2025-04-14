@@ -10,39 +10,56 @@
   box-sizing: border-box;
 }
 
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  
+  /* display: flex;
+  align-items: center;
+  justify-content: center; */
+}
+
 body {
   background: linear-gradient(160deg, #89c2d9, #468faf);
-  display: flex;
+  /* display: flex;
   flex-direction: column;
-  align-items: center;
-  min-height: 100vh;
+  align-items: center; */
   overflow: hidden;
   margin: 0;
   scrollbar-width: none;
 }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100vh;
-  width: 100vw;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+body {
+  padding-bottom: env(safe-area-inset-bottom, 4vmin);
 }
 
 #game-wrapper {
-  width: min(100vw, calc(100vh * 5 / 8));
+  display: flex;
+  flex-direction: column;
+  /* width: min(100vw, calc(100dvh * 5 / 8));*/
+  /* width: 100%; */
   height: 100%;
-  aspect-ratio: 5 / 8;
+  /* max-height: 100dvh; */
+  /* aspect-ratio: 5 / 8; */
+  max-width: 100%;
+  max-height: 100%;
   background: #48cae4;
   background: linear-gradient(135deg, #468faf, #89c2d9);
   overflow: hidden;
+  padding-bottom: 20px;
 }
+
 
 
 body::-webkit-scrollbar {
   display: none;
+}
+
+.top-panel,
+.bottom-buttons {
+  flex-shrink: 0;
 }
 
 .top-panel {
@@ -56,7 +73,7 @@ body::-webkit-scrollbar {
   margin: 2vmin 0;
   height: 10vmin; */
 
-  flex: 0 0 12%;
+  /* flex: 0 0 12%; */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -102,41 +119,53 @@ body::-webkit-scrollbar {
 
   /* aspect-ratio: 1 / 1; */
 
-  background: #00b4d8;
-  background: radial-gradient(circle at center, #014f86, #2c7da0);
-  flex: 1 1 auto;
+  
+  
+  /* flex: 1 1 auto; */
+  flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
   overflow: hidden;
   border-radius: 16px;
-  
-
-}
-
-#grid {
-  position: relative;
-  width: 90%;
-  height: 90%;
-  aspect-ratio: 1 / 1;
 }
 
 .grid-container {
-  flex: 1;
-  border-radius: 12px;
-  padding: 2vmin;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  height: auto;
   gap: 2vmin;
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
   position: relative;
+  background: radial-gradient(circle at center, #014f86, #2c7da0);
+
+  /* flex: 1; */
+  border-radius: 12px;
+  padding: 2vmin;
+}
+
+@media (orientation: landscape) {
+  .grid-container {
+    width: auto;
+    height: 100%;
+  }
 }
 
 .cell {
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
   /* width: 21vmin;
   height: 21vmin; */
-  aspect-ratio: 1 / 1;
+  /* aspect-ratio: 1 / 1; */
   background: radial-gradient(circle at center, #ade8f4, #caf0f8);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
   border-radius: 12px;
@@ -281,6 +310,7 @@ body::-webkit-scrollbar {
 }
 
 .icon-button {
+  position: relative;
   background: none;
   border: none;
   padding: 1vmin;
@@ -299,6 +329,11 @@ body::-webkit-scrollbar {
 
 .icon-button:hover {
   transform: scale(1.1);
+}
+
+.icon-button:active {
+  background-color: #ccc;
+  transform: scale(0.98); /* эффект "вдавливания" */
 }
 
 .icon-button img {
@@ -404,12 +439,12 @@ body::-webkit-scrollbar {
 
 @keyframes pulse {
   0%   { box-shadow: 0 0 2vmin rgba(255, 215, 0, 0.7); }
-  50%  { box-shadow: 0 0 1vmin rgba(255, 215, 0, 1); }
+  50%  { box-shadow: 0 0 1vmin rgb(253, 253, 253); }
   100% { box-shadow: 0 0 2vmin rgba(255, 215, 0, 0.7); }
 }
 
 
-@keyframes pulse-red {
+@keyframes ulsulse-red {
   0%   { box-shadow: 0 0 2vmin rgba(255, 80, 80, 0.6); }
   50%  { box-shadow: 0 0 3vmin rgba(255, 50, 50, 0.9); }
   100% { box-shadow: 0 0 2vmin rgba(255, 80, 80, 0.6); }
@@ -417,7 +452,7 @@ body::-webkit-scrollbar {
 
 .tile.selected {
   animation: pulse 1s infinite;
-  transform: scale(1.1);
+  transform: scale(1.4);
   z-index: 20;
 }
 
@@ -570,7 +605,7 @@ body::-webkit-scrollbar {
   gap: 2vmin;
   font-size: 5vmin;
   padding: 2vmin 4vmin;
-  background: radial-gradient(circle at center, #2c7da0,  #014f86);
+  background: radial-gradient(circle at center, #3b7b96,  #1972b1);
   color: white;
   font-weight: bold;
   border: none;
@@ -579,10 +614,28 @@ body::-webkit-scrollbar {
   transition: background 0.2s ease;
 }
 
+#go-destroy,
+#go-swap,
+#no-currency-watch-ad {
+  background: radial-gradient(circle at center, #2c7da0,  #014f86);
+  animation: pulse 2s infinite;
+  /* transform: scale(1.01); */
+}
+
+#go-watch-ad,
+#go-restart {
+  font-size: 3vmin;
+}
+
 .settings-content button:hover {
   background: #e09e20;
   background: linear-gradient(135deg, #023e8a, #03045e);
   transform: scale(1.1);
+}
+
+.settings-content button:active {
+  background-color: #ccc;
+  transform: scale(0.98); /* эффект "вдавливания" */
 }
 
 .settings-content button img {
@@ -608,9 +661,6 @@ body::-webkit-scrollbar {
   -webkit-text-fill-color: transparent;
 }
 
-.icon-button {
-  position: relative;
-}
 .reward-label {
   position: absolute;
   bottom: -1vmin;
