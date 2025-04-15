@@ -131,11 +131,6 @@ body::-webkit-scrollbar {
   }
 }
 
-.grid-container.fixed-square {
-  width: auto !important;
-  height: auto !important;
-}
-
 .cell {
 
   display: flex;
@@ -312,6 +307,7 @@ body::-webkit-scrollbar {
 @media screen and (max-aspect-ratio: 3/4) {
   .icon-button {
     width: 18%;
+    padding: 1px;
   }
 }
 
@@ -675,6 +671,16 @@ body::-webkit-scrollbar {
   color: #ff4d4d;
   font-weight: bold;
   text-shadow: 0 0 1vmin rgba(255, 0, 0, 0.4);
+}
+
+@media screen and (max-aspect-ratio: 3/4) {
+  .reward-label {
+    font-size: 3vmin;
+  }
+  .reward-label img {
+    width: 3vmin;
+    height: 3vmin;
+  }
 }
 
 #game-over-overlay p,

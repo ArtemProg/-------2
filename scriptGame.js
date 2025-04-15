@@ -197,6 +197,8 @@ window.addEventListener("load", () => {
         ? game.lang
         : game.langs.includes[0];
 
+      document.documentElement.lang = game.currentLang;
+
       loadingResources(() => {
         updateLangTexts();
         initGame(() => {
