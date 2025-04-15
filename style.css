@@ -19,6 +19,10 @@ html, body {
   /* display: flex;
   align-items: center;
   justify-content: center; */
+  overflow: hidden;
+  scrollbar-width: none;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 body {
@@ -26,9 +30,6 @@ body {
   /* display: flex;
   flex-direction: column;
   align-items: center; */
-  overflow: hidden;
-  margin: 0;
-  scrollbar-width: none;
 }
 
 body {
@@ -38,11 +39,9 @@ body {
 #game-wrapper {
   display: flex;
   flex-direction: column;
-  /* width: min(100vw, calc(100dvh * 5 / 8));*/
-  /* width: 100%; */
+
   height: 100%;
-  /* max-height: 100dvh; */
-  /* aspect-ratio: 5 / 8; */
+
   max-width: 100%;
   max-height: 100%;
   background: #48cae4;
@@ -63,17 +62,7 @@ body::-webkit-scrollbar {
 }
 
 .top-panel {
-  /* width: 82vmin;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 3.5vmin;
-  font-weight: bold;
-  color: #5c4633;
-  margin: 2vmin 0;
-  height: 10vmin; */
 
-  /* flex: 0 0 12%; */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -106,22 +95,7 @@ body::-webkit-scrollbar {
 }
 
 .game-container {
-  /* width: min(82vmin, 82vw);
-  aspect-ratio: 1 / 1;
-  max-width: 82vmin;
-  max-height: 82vmin;
-  position: relative;
-  border-radius: 16px;
-  background: #fdf3dd;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-  display: flex;
-  flex-direction: column; */
 
-  /* aspect-ratio: 1 / 1; */
-
-  
-  
-  /* flex: 1 1 auto; */
   flex: 1;
   display: flex;
   justify-content: center;
@@ -150,11 +124,16 @@ body::-webkit-scrollbar {
   padding: 2vmin;
 }
 
-@media (orientation: landscape) {
+@media screen and (orientation: landscape), screen and (min-aspect-ratio: 4/5) {
   .grid-container {
     width: auto;
     height: 100%;
   }
+}
+
+.grid-container.fixed-square {
+  width: auto !important;
+  height: auto !important;
 }
 
 .cell {
@@ -302,11 +281,14 @@ body::-webkit-scrollbar {
 }
 
 .bottom-buttons {
+  margin-top: 5vmin;
+}
+
+.bottom-buttons-container {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 1vmin;
-  margin-top: 5vmin;
 }
 
 .icon-button {
@@ -318,13 +300,19 @@ body::-webkit-scrollbar {
   background-color: #fdf3dd;
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   cursor: pointer;
-  width: 11vmin;
-  height: 11vmin;
+  width: 12vmin;
+  height: auto;
   display: flex;
   justify-content: center;
   align-items: center;
   transition: transform 0.1s ease;
   aspect-ratio: 1 / 1;
+}
+
+@media screen and (max-aspect-ratio: 3/4) {
+  .icon-button {
+    width: 18%;
+  }
 }
 
 .icon-button:hover {

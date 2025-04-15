@@ -13,6 +13,9 @@ const PlayerStatsManager = {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 this.forceSave(); // Принудительно сохраняем, без задержки
+                musicOnPause(true);
+            } else {
+              musicOnPause(false);
             }
         });
         window.addEventListener('beforeunload', () => {
@@ -218,6 +221,9 @@ window.addEventListener("load", () => {
 function initGame(callback) {
 
     createGrid();
+    
+    syncTileSizeWithCell();
+
     initDefaultSettings();
 
     game.isSoundOn = localStorage.getItem("sound") !== "false";
@@ -258,7 +264,9 @@ function initGame(callback) {
         startGame();
         setupInput();
         
-        window.addEventListener('resize', syncTileSizeWithCell);
+        window.addEventListener('resize', () => {
+          syncTileSizeWithCell();
+        });
 
         // ✅ Когда музыка загрузилась
         game.bgMusic.addEventListener('canplaythrough', () => {
@@ -293,16 +301,16 @@ function initGame(callback) {
 
 function closeSettingsOverlay() {
     const content = game.settingsOverlay.querySelector(".settings-content");
-            gsap.to(content, {
-                scale: 0.5,
-                opacity: 0,
-                duration: 0.3,
-                ease: "back.in(1.7)",
-                onComplete: () => {
-                    game.settingsOverlay.classList.add("hidden");
-                    game.isPaused = false;
-                }
-            });
+    gsap.to(content, {
+        scale: 0.5,
+        opacity: 0,
+        duration: 0.3,
+        ease: "back.in(1.7)",
+        onComplete: () => {
+            game.settingsOverlay.classList.add("hidden");
+            game.isPaused = false;
+        }
+    });
 }
 
 function loadCloudSave() {
@@ -638,6 +646,7 @@ function createGrid() {
     }
     syncTileSizeWithCell();
 }
+
 function syncTileSizeWithCell() {
 
     adjustGameContainerMargin();
@@ -882,7 +891,7 @@ function tryStartMusic() {
     if (game.musicReady && !game.musicStarted && game.isSoundOn) {
       
 
-        audio.volume = 0.2;
+        audio.volume = 0.1;
         audio.loop = true;
 
         audio.play().then(() => {
@@ -1292,6 +1301,7 @@ function showAdsVideo(source = "game") {
     callbacks: {
         onOpen: () => {
           console.log('Video ad open.');
+          musicOnPause(true);
         },
         onRewarded: () => {
 
@@ -1311,6 +1321,7 @@ function showAdsVideo(source = "game") {
         },
         onClose: () => {
           console.log('Video ad closed.');
+          musicOnPause(false);
           setTimeout(() => {
             syncTileSizeWithCell();
           }, 150);
@@ -1542,7 +1553,16 @@ function showNoCurrencyOverlay() {
 
   document.getElementById("no-currency-watch-ad").onclick = () => {
     overlay.classList.add("hidden");
-    game.isPaused = false;
     showAdsVideo("settings"); // или "settings", если нужно
   };
+}
+
+function musicOnPause(isActive = true) {
+  if (!game.isSoundOn || !game.musicReady) return;
+  if (isActive) {
+    if (!game.bgMusic.paused) game.bgMusic.pause();
+  } else {
+    if (game.bgMusic.paused) game.bgMusic.play();
+  }
+  
 }
