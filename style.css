@@ -687,3 +687,16 @@ body::-webkit-scrollbar {
 #game-over-overlay img {
   margin: 0;
 }
+
+
+
+
+.win-particle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, #ffcc00, #ff0080);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+}

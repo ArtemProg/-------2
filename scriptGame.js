@@ -737,6 +737,14 @@ function checkWin(cell) {
           tile.classList.remove("selected");
         }, 2000);
 
+
+        
+        
+        const rect = tile.getBoundingClientRect();
+        playVictoryParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+
+
     }
 }
 
@@ -1480,7 +1488,7 @@ function restartGame() {
     
     game.score = 0;
     game.historyStack.length = 0;
-    game.highestLevelReached = 0;
+    game.highestLevelReached = 2;
     
     game.gridElement.innerHTML = "";
     game.grid = [];
@@ -1668,4 +1676,30 @@ function musicOnPause(isActive = true) {
     tryStartMusic();
   }
   
+}
+
+
+function playVictoryParticles(x, y) {
+  for (let i = 0; i < 50; i++) {
+    const p = document.createElement('div');
+    p.className = 'win-particle';
+    document.body.appendChild(p);
+
+    p.style.left = `${x}px`;
+    p.style.top = `${y}px`;
+    p.style.background = `hsl(${Math.random() * 360}, 90%, 60%)`;
+
+    const dx = (Math.random() - 0.5) * 400;
+    const dy = (Math.random() - 0.5) * 400;
+
+    gsap.to(p, {
+      x: dx,
+      y: dy,
+      scale: 0.5 + Math.random(),
+      opacity: 0,
+      duration: 0.5 + Math.random(),
+      ease: 'power2.out',
+      onComplete: () => p.remove()
+    });
+  }
 }
