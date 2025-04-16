@@ -128,6 +128,87 @@ const PlayerStatsManager = {
 
 };
 
+const SoundManager = {
+  sounds: {},
+  musicEnabled: true,
+  effectsEnabled: true,
+
+  load(name, sources, loop = false) {
+    const audio = document.createElement("audio");
+
+    for (const src of sources) {
+      const type = this.getMimeType(src);
+      if (audio.canPlayType(type)) {
+        audio.src = src;
+        audio.preload = "auto";
+        audio.loop = loop;
+        this.sounds[name] = audio;
+        return;
+      }
+    }
+
+    console.warn(`⛔ Ни один формат не поддерживается для: ${name}`);
+  },
+
+  getMimeType(filename) {
+    if (filename.endsWith(".mp3")) return "audio/mpeg";
+    if (filename.endsWith(".m4a")) return "audio/mp4";
+    if (filename.endsWith(".ogg")) return "audio/ogg";
+    return "";
+  },
+
+  play(name) {
+    if (!this.effectsEnabled) return;
+    const sound = this.sounds[name];
+    if (sound && !sound.loop) {
+      sound.volume = 0.1;
+      sound.currentTime = 0;
+      sound.play().catch(err => {
+        console.warn(`⛔ Не удалось воспроизвести звук "${name}"`, err);
+      });
+    }
+  },
+
+  playMusic(name) {
+    if (!this.musicEnabled) return;
+    const sound = this.sounds[name];
+    if (sound && sound.loop) {
+      sound.volume = 0.01;
+      sound.play().catch(err => {
+        console.warn(`⛔ Не удалось воспроизвести музыку "${name}"`, err);
+      });
+    }
+  },
+
+  stop(name) {
+    const sound = this.sounds[name];
+    if (sound) {
+      sound.pause();
+      sound.currentTime = 0;
+    }
+  },
+
+  pause(name) {
+    const sound = this.sounds[name];
+    if (sound) sound.pause();
+  },
+
+  toggleMusic(enable) {
+    this.musicEnabled = enable;
+    if (!enable) this.pause("bg");
+  },
+
+  toggle(enable) {
+    this.enabled = enable;
+    if (!enable) {
+      for (const s of Object.values(this.sounds)) {
+        s.pause();
+        s.currentTime = 0;
+      }
+    }
+  }
+};
+
 
 const game = {
     preloaderImages: [],
@@ -137,7 +218,7 @@ const game = {
     cellSize: 0,
     gridSize: 4,
 
-    highestLevelReached: 4,
+    highestLevelReached: 2,
 
     gridElement: document.getElementById("grid"),
     settingsOverlay: document.getElementById("settings-overlay"),
@@ -146,14 +227,13 @@ const game = {
     elScore: document.getElementById("score"),
     destroyPanel: document.getElementById("destroy-mode-panel"),
     swapPanel: document.getElementById("swap-mode-panel"),
-    bgMusic: document.getElementById('bg-music'),
 
     selectedTiles: [],
 
     historyStack: [],
     HISTORY_LIMIT: 10,
 
-    isSoundOn: false,
+    isMusicOn: false,
     musicReady: false,
     musicStarted: false,
 
@@ -186,6 +266,15 @@ const game = {
     currentLang: "ru",
     translations: {},
 
+    dailyReward: 395,
+    videoReward: 250,
+    undoPrice: 110,
+    destroyPrice: 100,
+    swapPrice: 120,
+    currencyStart: 100,
+
+    intervalSmartAd: 3000,
+
 };
 
 window.addEventListener("load", () => {
@@ -209,7 +298,7 @@ window.addEventListener("load", () => {
 
           setInterval(() => {
             tryShowSmartAd("auto");
-          }, 30000);
+          }, game.intervalSmartAd);
 
         });
       });
@@ -228,10 +317,10 @@ function initGame(callback) {
 
     initDefaultSettings();
 
-    game.isSoundOn = localStorage.getItem("sound") !== "false";
+    game.isMusicOn = localStorage.getItem("music") !== "false";
     game.lastAdTimestamp = Number(localStorage.getItem("lastAdTimestamp") || 0);
 
-    updateLabelSound();
+    updateLabelMusic();
     
     return ysdk.getPlayer().then(_player => {
         game.player = _player;
@@ -258,11 +347,24 @@ function initGame(callback) {
                 spawnTile();
             }, 200);
             if (!game.hasEnteredBefore) {
-                game.currency = 100;
+                game.currency = game.currencyStart;
                 game.hasEnteredBefore = true;
             }
         }
 
+        SoundManager.load("bg", ["sound/music.m4a", "sound/music.mp3"], true);
+        // SoundManager.load("merge", ["sound/merge.m4a", "sound/merge.mp3"]);
+        // SoundManager.load("swap", ["sound/swap.m4a", "sound/swap.mp3"]);
+        // SoundManager.load("destroy", ["sound/destroy.m4a", "sound/destroy.mp3"]);
+        SoundManager.load("destroy", ["sound/destroy.mp3"]);
+        SoundManager.load("swap", ["sound/swap.mp3"]);
+        SoundManager.load("undo", ["sound/undo.mp3"]);
+        SoundManager.load("levelUp", ["sound/levelUp.mp3"]);
+        
+        SoundManager.sounds["bg"].addEventListener("canplaythrough", () => {
+          game.musicReady = true;
+        });
+        
         startGame();
         setupInput();
         
@@ -270,10 +372,6 @@ function initGame(callback) {
           syncTileSizeWithCell();
         });
 
-        // ✅ Когда музыка загрузилась
-        game.bgMusic.addEventListener('canplaythrough', () => {
-            game.musicReady = true;
-        });
 
         PlayerStatsManager.init();
 
@@ -285,7 +383,7 @@ function initGame(callback) {
 
         document.getElementById("new-game-btn").addEventListener("click", restartGame);
         document.getElementById("watch-ad-btn").addEventListener("click", () => showAdsVideo("settings"));
-        document.getElementById("toggle-sound-btn").addEventListener("click", toggleSound);
+        document.getElementById("toggle-music-btn").addEventListener("click", toggleMusic);
         document.getElementById("close-settings-btn").addEventListener("click", closeSettingsOverlay);
 
         // Навешиваем на первое взаимодействие
@@ -396,7 +494,7 @@ function initDefaultSettings() {
     game.historyStack = [];
     game.isPlaying = false;
     game.isPaused = false;
-    game.isSoundOn = false;
+    game.isMusicOn = false;
     game.musicReady = false;
     game.musicStarted = false;
     game.lastClaimDate = new Date();
@@ -462,7 +560,7 @@ function showLevelUpPopup(level) {
                             game.isPlaying = true;
                         }
                     });
-                }, 2000);
+                }, 700);
             }
         }
     );
@@ -514,7 +612,7 @@ function move(direction) {
           if (toCell) {
             const toTile = toCell.el;
             const newValue = toCell.value * 2;
-            currency += getLevel(toCell.value);
+            currency += Math.round(getLevel(toCell.value)/4);
             game.grid[r][c] = null;
             setTimeout(() => {
               game.gridElement.removeChild(fromTile);
@@ -527,7 +625,7 @@ function move(direction) {
               styleTile(toTile, newValue);
               setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
               addScore(newValue);
-              checkWin(newValue);
+              checkWin(toCell);
               }, 150);
           } else {
             game.grid[nr][nc] = cell;
@@ -622,14 +720,23 @@ function spawnTile() {
     styleTile(tile, value);
     setTileSprite(tile.querySelector('.tile-sprite'), value);
     game.gridElement.appendChild(tile);
-    checkWin(value);
+    checkWin(game.grid[r][c]);
 }
 
-function checkWin(value) {
-    const level = getLevel(value);
-    if (level >= 5 && level > game.highestLevelReached) {
+function checkWin(cell) {
+    const level = getLevel(cell.value);
+    if (level > game.highestLevelReached) {
         game.highestLevelReached = level;
-        showLevelUpPopup(level);
+        
+        if (level > 3) SoundManager.play("levelUp");
+        if (level > 6) showLevelUpPopup(level);
+
+        const tile = cell.el;
+        tile.classList.add("selected");
+        setTimeout(() => {
+          tile.classList.remove("selected");
+        }, 2000);
+
     }
 }
 
@@ -880,53 +987,35 @@ function setupInput() {
 }
 
 function tryStartMusic() {
-  const audio = game.bgMusic;
+  if (game.musicStarted || !game.isMusicOn) return;
 
-  // проверка, если уже загружается/играет — ничего не делать
-    if (audio && !audio.dataset.initialized) {
-      // пометить как инициализированное
-      audio.dataset.initialized = true;
-      audio.load();
-      return;
-    };
+  const music = SoundManager.sounds["bg"];
 
-    if (game.musicReady && !game.musicStarted && game.isSoundOn) {
-      
+  if (!music) return;
 
-        audio.volume = 0.1;
-        audio.loop = true;
+  // если не инициализировано — загрузим (один раз)
+  if (!music.dataset?.initialized) {
+    music.dataset = music.dataset || {};
+    music.dataset.initialized = true;
+    music.load();
+    return;
+  }
 
-        audio.play().then(() => {
-            console.log("Музыка играет!");
-            game.musicStarted = true;
-        }).catch(err => {
-            console.warn("Ошибка запуска музыки:", err);
-            showMusicStartPrompt();
-        });
-    
-        document.removeEventListener("click", tryStartMusic);
-        window.removeEventListener("touchstart", tryStartMusic);
-        window.removeEventListener("keydown", tryStartMusic);
-      
-    }
-}
+  // попытка воспроизведения
+  music.volume = 0.01;
+  music.loop = true;
 
-function showMusicStartPrompt() {
-  const prompt = document.createElement("div");
-  prompt.className = "overlay";
-  prompt.innerHTML = `
-      <div class="overlay-content">
-          <h1>🎵 Музыка не включилась</h1>
-          <p>Нажмите кнопку, чтобы включить музыку</p>
-          <button id="start-music-btn">Включить музыку</button>
-      </div>
-  `;
-  document.body.appendChild(prompt);
-
-  document.getElementById("start-music-btn").addEventListener("click", () => {
-      tryStartMusic();
-      prompt.remove();
+  music.play().then(() => {
+    console.log("🎵 Музыка играет!");
+    game.musicStarted = true;
+  }).catch(err => {
+    console.warn("⚠️ Ошибка запуска музыки:", err);
   });
+
+  // Удалим слушатели после первой попытки
+  document.removeEventListener("click", tryStartMusic);
+  window.removeEventListener("touchstart", tryStartMusic);
+  window.removeEventListener("keydown", tryStartMusic);
 }
 
 //------------------------------------------
@@ -951,7 +1040,8 @@ function pushToHistory(snapshot) {
 function undoMove() {
     if (game.destroyMode || game.swapMode) return;
   
-    const cost = 110;
+    const cost = game.undoPrice;
+
     if (game.currency < cost) {
       showNoCurrencyOverlay();
       return;
@@ -960,6 +1050,8 @@ function undoMove() {
     const prev = game.historyStack.pop();
     if (!prev) return;
   
+    SoundManager.play("undo");
+
     game.currency -= cost;
   
     game.score = prev.score;
@@ -1006,7 +1098,8 @@ function enterDestroyMode() {
     return;
   }
 
-  const cost = 100;
+  const cost = game.destroyPrice;
+
   if (game.currency < cost) {
     showNoCurrencyOverlay();
     return;
@@ -1083,6 +1176,8 @@ function handleDestroyClick(e) {
     const centerX = tileRect.top + tileRect.width / 2;
     const centerY = tileRect.left + tileRect.height / 2;
   
+    SoundManager.play("destroy");
+
     // Частицы
     for (let i = 0; i < 15; i++) {
       const p = document.createElement('div');
@@ -1171,7 +1266,7 @@ function enterSwapMode() {
     return;
   }
 
-  const cost = 120;
+  const cost = game.swapPrice;
   
   if (game.currency < cost) {
     showNoCurrencyOverlay();
@@ -1265,6 +1360,8 @@ function handleSwapClick(e) {
         const posA = { x: first.c * game.cellSize + game.gap, y: first.r * game.cellSize + game.gap };
         const posB = { x: second.c * game.cellSize + game.gap, y: second.r * game.cellSize + game.gap };
 
+        SoundManager.play("swap");
+
         gsap.to(elA, {
             x: posB.x + 'vmin',
             y: posB.y + 'vmin',
@@ -1314,9 +1411,6 @@ function showAdsVideo(source = "game") {
             () => {
               updateCurrencyDisplay();
               PlayerStatsManager.prepareChanges();
-              setTimeout(() => {
-                syncTileSizeWithCell();
-              }, 150);
           });
 
           console.log('Rewarded!');
@@ -1325,7 +1419,7 @@ function showAdsVideo(source = "game") {
           console.log('Video ad closed.');
           musicOnPause(false);
           setTimeout(() => {
-            syncTileSizeWithCell();
+            // syncTileSizeWithCell();
           }, 150);
         },
         onError: (e) => {
@@ -1355,7 +1449,7 @@ function updateLangTexts() {
   
   document.getElementById("new-game-btn").querySelector('span').textContent = t("newGame");
   document.getElementById("watch-ad-btn").querySelector('span').textContent = t("getGems");
-  document.getElementById("toggle-sound-btn").querySelector('span').textContent = t("sound");
+  document.getElementById("toggle-music-btn").querySelector('span').textContent = t("music");
   document.getElementById("close-settings-btn").querySelector('span').textContent = t("continue");
   
   document.getElementById("go-destroy").querySelector('span').textContent = t("destroy");
@@ -1374,10 +1468,12 @@ function updateLangTexts() {
 
   game.destroyPanel.querySelector('p').textContent = t("destroyInstruction");
   game.swapPanel.querySelector('p').textContent = t("swapInstruction");
-  // document.getElementById("toggle-sound-btn").querySelector('span').textContent = t("sound");
-  // document.getElementById("close-settings-btn").querySelector('span').textContent = t("continue");
-  // document.getElementById("no-currency-text").textContent = t("notEnoughGems");
-  // и т.д.
+  
+  document.getElementById("ad-button").querySelector('span').textContent = `+${game.videoReward}`;
+  document.getElementById("undo-button").querySelector('span').textContent = game.undoPrice;
+  document.getElementById("destroy-button").querySelector('span').textContent = game.destroyPrice;
+  document.getElementById("swap-button").querySelector('span').textContent = game.swapPrice;
+
 }
 
 function restartGame() {
@@ -1409,27 +1505,29 @@ function restartGame() {
     tryShowSmartAd("newgame");
 }
 
-function toggleSound() {
+function toggleMusic() {
     
-    game.isSoundOn = !game.isSoundOn;
+    game.isMusicOn = !game.isMusicOn;
 
-    localStorage.setItem("sound", game.isSoundOn); // сохраним настройку
+    localStorage.setItem("music", game.isMusicOn); // сохраним настройку
     
-    updateLabelSound();
+    updateLabelMusic();
   
-    if (game.isSoundOn && game.musicReady) {
-        game.bgMusic.play();
+    SoundManager.toggleMusic(game.isMusicOn);
+    if (game.isMusicOn) {
+      tryStartMusic();
     } else {
-        game.bgMusic.pause();
+      SoundManager.pause("bg");
+      game.musicStarted = false;
     }
 }
 
-function updateLabelSound() {
-    const soundText = document.getElementById("sound-text");
-    soundText.textContent = game.isSoundOn ? t("soundOn") : t("soundOff");
+function updateLabelMusic() {
+    const musicText = document.getElementById("music-text");
+    musicText.textContent = game.isMusicOn ? t("musicOn") : t("musicOff");
 
-    const soundIcon = document.getElementById("sound-icon");
-    soundIcon.src = game.isSoundOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
+    const musicIcon = document.getElementById("music-icon");
+    musicIcon.src = game.isMusicOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
 }
 
 function checkDailyReward() {
@@ -1438,18 +1536,20 @@ function checkDailyReward() {
 
   if (!game.lastDailyReward || game.lastDailyReward.toDateString() !== today) {
     
-    const rewardAmount = 395;
-    const text = t("dailyReward", { amount: rewardAmount });
-    
-    // Показываем всплывающее окно
-    showRewardPopup(
-      text,
-      () => {
-        // Даем награду
-        game.currency += rewardAmount;
-        game.lastDailyReward = new Date();
-        updateCurrencyDisplay();
-    });
+    setTimeout(() => {
+      const rewardAmount = game.dailyReward;
+      const text = t("dailyReward", { amount: rewardAmount });
+      
+      // Показываем всплывающее окно
+      showRewardPopup(
+        text,
+        () => {
+          // Даем награду
+          game.currency += rewardAmount;
+          game.lastDailyReward = new Date();
+          updateCurrencyDisplay();
+      });
+      }, 1000);
   }
 }
 
@@ -1512,7 +1612,7 @@ function showFullscreenAd(callbackAfterAd = null) {
         if (wasShown) {
           game.lastAdTimestamp = Date.now();
           setTimeout(() => {
-            syncTileSizeWithCell();
+            // syncTileSizeWithCell();
           }, 150);
         }
         if (callbackAfterAd) callbackAfterAd?.();
@@ -1560,11 +1660,12 @@ function showNoCurrencyOverlay() {
 }
 
 function musicOnPause(isActive = true) {
-  if (!game.isSoundOn || !game.musicReady) return;
+  if (!game.isMusicOn || !game.musicReady) return;
   if (isActive) {
-    if (!game.bgMusic.paused) game.bgMusic.pause();
+    SoundManager.pause("bg");
+    game.musicStarted = false;
   } else {
-    if (game.bgMusic.paused) game.bgMusic.play();
+    tryStartMusic();
   }
   
 }

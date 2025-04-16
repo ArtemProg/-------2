@@ -7,9 +7,9 @@
 
     "newGame": "New Game",
     "continue": "Continue",
-    "sound": "Sound",
-    "soundOn": "Sound: On",
-    "soundOff": "Sound: Off",
+    "music": "Music",
+    "musicOn": "Music: On",
+    "musicOff": "Music: Off",
 
     "title-game-over-1": "No available moves",
     "title-game-over-2": "But you can continue!",
