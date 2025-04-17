@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2048</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #faf8ef;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .game-wrapper {
+      position: relative;
+      width: 460px;
+      height: 460px;
+    }
+
+    .grid, .tiles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: grid;
+      grid-template-columns: repeat(4, 100px);
+      grid-template-rows: repeat(4, 100px);
+      gap: 10px;
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .cell {
+      background: #ccc0b3;
+      border-radius: 6px;
+    }
+
+    .tile {
+      width: 100px;
+      height: 100px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 32px;
+      user-select: none;
+      position: absolute;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .controls {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 60px 60px 60px;
+      grid-template-rows: 60px 60px;
+      gap: 10px;
+    }
+
+    .controls button {
+      font-size: 24px;
+      font-weight: bold;
+      background: #8f7a66;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .controls button:active {
+      background: #555;
+    }
+
+    .n2    { background: #eee4da; color: #776e65; }
+    .n4    { background: #ede0c8; color: #776e65; }
+    .n8    { background: #f2b179; color: #f9f6f2; }
+    .n16   { background: #f59563; color: #f9f6f2; }
+    .n32   { background: #f67c5f; color: #f9f6f2; }
+    .n64   { background: #f65e3b; color: #f9f6f2; }
+    .n128  { background: #edcf72; color: #f9f6f2; }
+    .n256  { background: #edcc61; color: #f9f6f2; }
+    .n512  { background: #edc850; color: #f9f6f2; }
+    .n1024 { background: #edc53f; color: #f9f6f2; }
+    .n2048 { background: #edc22e; color: #f9f6f2; }
+  </style>
+</head>
+<body>
+  <h1>2048</h1>
+
+  <div class="game-wrapper">
+    <div class="grid" id="grid">
+      <!-- создаются ячейки -->
+    </div>
+    <div class="tiles" id="tiles">
+      <!-- динамически генерируются плитки -->
+    </div>
+  </div>
+
+  <div class="controls">
+    <div></div>
+    <button onclick="handleMove('ArrowUp')">⬆️</button>
+    <div></div>
+    <button onclick="handleMove('ArrowLeft')">⬅️</button>
+    <button onclick="handleMove('ArrowDown')">⬇️</button>
+    <button onclick="handleMove('ArrowRight')">➡️</button>
+  </div>
+
+  <script>
+    const size = 4;
+    let gridData = [];
+    const grid = document.getElementById('grid');
+    const tiles = document.getElementById('tiles');
+
+    function createGridCells() {
+      grid.innerHTML = '';
+      for (let i = 0; i < size * size; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        grid.appendChild(cell);
+      }
+    }
+
+    function drawTiles() {
+      tiles.innerHTML = '';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (gridData[r][c] !== 0) {
+            const tile = document.createElement('div');
+            tile.className = `tile n${gridData[r][c]}`;
+            tile.textContent = gridData[r][c];
+            tile.style.transform = `translate(${c * 110}px, ${r * 110}px)`;
+            tiles.appendChild(tile);
+          }
+        }
+      }
+    }
+
+    function spawnTile() {
+      let empty = [];
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (gridData[r][c] === 0) empty.push([r, c]);
+        }
+      }
+      if (empty.length === 0) return;
+      const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+      gridData[r][c] = Math.random() < 0.9 ? 2 : 4;
+    }
+
+    function arraysEqual(a, b) {
+      return a.length === b.length && a.every((val, i) => val === b[i]);
+    }
+
+    function moveLeft() {
+      let moved = false;
+      for (let r = 0; r < size; r++) {
+        let row = gridData[r].filter(x => x !== 0);
+        for (let i = 0; i < row.length - 1; i++) {
+          if (row[i] === row[i + 1]) {
+            row[i] *= 2;
+            row[i + 1] = 0;
+            moved = true;
+          }
+        }
+        row = row.filter(x => x !== 0);
+        while (row.length < size) row.push(0);
+        if (!arraysEqual(gridData[r], row)) moved = true;
+        gridData[r] = row;
+      }
+      return moved;
+    }
+
+    function rotate(clockwise = true) {
+      const newGrid = Array.from({ length: size }, () => Array(size).fill(0));
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (clockwise) newGrid[c][size - 1 - r] = gridData[r][c];
+          else newGrid[size - 1 - c][r] = gridData[r][c];
+        }
+      }
+      gridData = newGrid;
+    }
+
+    function handleMove(direction) {
+      let moved = false;
+      if (direction === 'ArrowLeft') {
+        moved = moveLeft();
+      } else if (direction === 'ArrowRight') {
+        rotate(); rotate();
+        moved = moveLeft();
+        rotate(false); rotate(false);
+      } else if (direction === 'ArrowUp') {
+        rotate(false);
+        moved = moveLeft();
+        rotate();
+      } else if (direction === 'ArrowDown') {
+        rotate();
+        moved = moveLeft();
+        rotate(false);
+      }
+
+      if (moved) {
+        spawnTile();
+        drawTiles();
+      }
+    }
+
+    function initGame() {
+      gridData = Array.from({ length: size }, () => Array(size).fill(0));
+      spawnTile();
+      spawnTile();
+      createGridCells();
+      drawTiles();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        handleMove(e.key);
+      }
+    });
+
+    initGame();
+  </script>
+</body>
+</html>

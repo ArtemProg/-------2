@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>КотоСлияние Мерж</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" href="images/favicon.png">
+</head>
+<body>
+  <div id="game-wrapper">
+    <div class="top-panel">
+      <div class="currency"><img src="images/diamond.png" /><span id="currency">0</span></div>
+      <div class="score-large"><span id="score">0</span></div>
+      <div class="best"><img src="images/star.png" /><span id="best">0</span></div>
+    </div>
+    <div class="game-container">
+      <div class="grid-container" id="grid"></div>
+      <div id="tile-animation-layer" class="tile-animation-layer"></div>
+    </div>
+    <div class="bottom-buttons">
+      <div class="bottom-buttons-container">
+        <button id="ad-button" class="icon-button" title="Вознаграждение">
+          <img src="images/icon_ad.png"  />
+          <div class="reward-label">
+            <img src="images/diamond.png" />
+            <span>+415</span>
+          </div>
+        </button>
+        <button id="undo-button" class="icon-button" title="Отменить ход">
+          <img src="images/icon_undo.png" />
+          <div class="reward-label">
+            <img src="images/diamond.png"  />
+            <span>110</span>
+          </div>
+        </button>
+        <button id="destroy-button" class="icon-button" title="Убрать плитку">
+          <img src="images/icon_remove.png"  />
+          <div class="reward-label">
+            <img src="images/diamond.png" />
+            <span>100</span>
+          </div>
+        </button>
+        <button id="swap-button" class="icon-button" title="Поменять местами">
+          <img src="images/icon_swap.png" />
+          <div class="reward-label">
+            <img src="images/diamond.png" />
+            <span>120</span>
+          </div>
+        </button>
+        <button id="settings-button" class="icon-button" title="Настройки">
+          <img src="images/icon_settings.png">
+        </button>
+      </div>
+    </div>
+    <div id="destroy-mode-panel" class="helper-panel hidden">
+      <img src="images/helper_1.png" class="helper-img" />
+      <p>Выберите плитку для уничтожения</p>
+    </div>
+    <div id="swap-mode-panel" class="helper-panel hidden">
+      <img src="images/helper_1.png" class="helper-img">
+      <p>Выберите две плитки по очереди, чтобы поменять их местами</p>
+    </div>
+    
+    <div id="game-over-overlay" class="overlay hidden">
+      <div class="settings-content">
+        <img src="images/helper_3.png" class="settings-cat" />
+        <p id="title-game-over-1" style="font-size: 6vmin; font-weight: bold; color: white;">Нет доступных ходов</p>
+        <p id="title-game-over-2" style="font-size: 4.5vmin; font-weight: bold; color: white; line-height: 1.2;">Но ты можешь продолжить!</p>
+        
+        <button id="go-destroy">
+          <img src="images/icon_remove.png" />
+          <span class="gradient-text">Разбить плитку</span>
+        </button>
+    
+        <button id="go-swap">
+          <img src="images/icon_swap.png" />
+          <span class="gradient-text">Поменять местами</span>
+        </button>
+    
+        <button id="go-watch-ad">
+          <img src="images/icon_ads.png" />
+          <span class="gradient-text">Посмотреть рекламу</span>
+        </button>
+    
+        <button id="go-restart">
+          <img src="images/icon_restart.png" />
+          <span class="gradient-text">Начать заново</span>
+        </button>
+      </div>
+    </div>
+
+    </div>
+    <div class="level-up-popup hidden" id="level-up-popup">
+      <img id="level-up-img" src="images/helper_1.png" >
+      <p id="level-up-text">Поздравляем!</p>
+    </div>
+    <div id="settings-overlay" class="overlay hidden">
+      <div class="settings-content">
+        <img src="images/helper_1.png" class="settings-cat" />
+        <button id="new-game-btn">
+          <img src="images/icon_restart.png" >
+          <span class="gradient-text">Новая игра</span>
+        </button>
+        <button id="watch-ad-btn">
+          <img src="images/icon_ads.png" >
+          <span class="gradient-text">Вознаграждение</span>
+        </button>
+        <button id="toggle-music-btn">
+          <img id="music-icon" src="images/icon_sound_on.png" >
+          <span class="gradient-text" id="music-text">Звук</span>
+        </button>
+        <button id="close-settings-btn">
+          <img src="images/icon_close.png" >
+          <span class="gradient-text">Продолжить</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="no-currency-overlay" class="overlay hidden">
+      <div class="settings-content">
+        <img src="images/helper_1.png" id="no-currency-cat" class="settings-cat" />
+        <p id="no-currency-text" style="font-size: 5vmin; color: white;">Котику не хватает самоцветов...</p>
+        <button id="no-currency-watch-ad">
+          <img src="images/icon_ads.png" />
+          <span class="gradient-text">Получить самоцветы</span>
+        </button>
+        <button id="no-currency-close">
+          <img src="images/icon_close.png" />
+          <span class="gradient-text">Закрыть</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+  <script src="https://yandex.ru/games/sdk/v2"></script>
+  <script src="gsap.min.js"></script>
+  <script src="scriptGame.js"></script>
+</body>
+</html>

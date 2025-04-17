@@ -1,0 +1,44 @@
+{
+    "getGems": "Get gems",
+    "undo": "Undo",
+    "destroy": "Destroy Tile",
+    "swap": "Swap Tiles",
+    "settings": "Settings",
+
+    "newGame": "New Game",
+    "continue": "Continue",
+    "music": "Music",
+    "musicOn": "Music: On",
+    "musicOff": "Music: Off",
+
+    "title-game-over-1": "No available moves",
+    "title-game-over-2": "But you can continue!",
+
+    "dailyReward": "🎁 Your daily prize: <span class='reward-amount'>+{amount}</span> gems!",
+
+    "randomNoCurrencyPhrases": [
+        "Meow... Kitty is out of gems!",
+        "Hey! You're out of gems 🥺",
+        "Want to keep going? Kitty would love more gems!",
+        "Time to refill the kitty’s stash of shinies!",
+        "Kitty is sad without gems...",
+        "Not even in the mood to purr without gems..."
+    ],
+
+    "randomLevelUpPhrases": [
+        "Kitty is proud of your progress!",
+        "You're getting closer to the whiskered legend!",
+        "Meow! You're simply amazing!",
+        "Looks like this cat has nine lives — all leveled up!",
+        "Kitty gave your level a paws-up!",
+        "You're purr-rich!",
+        "Step by step — to the whiskered summit!",
+        "Now that's a cat combo!",
+        "Your paws are clearly made for greatness!",
+        "You really know how to handle fluffy numbers!"
+    ],
+
+    "destroyInstruction": "Choose a tile to smash",
+    "swapInstruction": "Tap two tiles to swap them"
+  }
+  
