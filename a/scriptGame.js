@@ -747,8 +747,9 @@ function move(direction) {
   const snapshotBoard = getSnapshotBoard();
   const { actions, moved, currency } = computeActions(direction);
 
-  // const allCells = document.querySelectorAll(".cell");
-  // allCells.forEach(cell => cell.innerHTML = "");
+  let paramWin = {
+    sound: true,
+  }
 
   // Применяем действия
   actions.forEach(action => {
@@ -784,7 +785,7 @@ function move(direction) {
         toCell.appendChild(fromTile);
 
       })?.then(() => {
-        checkWin(game.grid[action.to.r][action.to.c]);
+        checkWin(game.grid[action.to.r][action.to.c], paramWin);
       });
 
     } else {
@@ -906,27 +907,35 @@ function spawnTile() {
     //game.gridElement.appendChild(tile);
 }
 
-function checkWin(cell) {
+function checkWin(cell, paramWin) {
     const level = getLevel(cell.value);
+    
+    if (level > 3) {
+      if (paramWin.sound) {
+        SoundManager.play("levelUp");
+        paramWin.sound = false;
+      }
+    }
+
+    if (level > 4) {
+      cell.el.classList.add("selected");
+      setTimeout(() => {
+        cell.el.classList.remove("selected");
+      }, 400);
+    }
+    
+    if (level > 5) {
+      // позиционируем в центре плитки;
+      const tileRect = cell.el.getBoundingClientRect();
+      const centerX = tileRect.left + tileRect.width / 2;
+      const centerY = tileRect.top + tileRect.height / 2;
+      
+      playVictoryParticles(centerX, centerY);
+    }
+
     if (level > game.highestLevelReached) {
-        game.highestLevelReached = level;
-        
-        if (level > 3) SoundManager.play("levelUp");
-        if (level > 6) showLevelUpPopup(level);
-
-        const tile = cell.el;
-        tile.classList.add("selected");
-        setTimeout(() => {
-          cell.el.classList.remove("selected");
-        }, 500);
-        
-        // позиционируем в центре плитки;
-        const tileRect = tile.getBoundingClientRect();
-        const centerX = tileRect.left + tileRect.width / 2;
-        const centerY = tileRect.top + tileRect.height / 2;
-
-        playVictoryParticles(centerX, centerY);
-
+      game.highestLevelReached = level;
+      if (level > 6) showLevelUpPopup(level);
     }
 }
 
@@ -1042,11 +1051,11 @@ function setTileSprite(spriteElement, value) {
     const level = getLevel(value);
     
     let path;
-    if (level >= 34) {
+    if (level > 33) {
         const helperIndex = ((level - 34) % 8) + 1;
         path = `images/helper_${helperIndex}.png`;
     } else {
-        const clamped = Math.min(level, 34);
+        const clamped = Math.min(level, 33);
         path = `images/set2/img_${clamped}.png`;
     }
     const cachedImage = game.preloaderImages[path];
@@ -1064,7 +1073,7 @@ function getRandomLevelUpPhrase() {
 function loadingResources(callback) {
 
     let imagePaths = [];
-    for(let i = 1; i <= 34; i++) {
+    for(let i = 1; i < 34; i++) {
         imagePaths.push(`images/set2/img_${i}.png`)
     }
     for(let i = 1; i < 9; i++) {
