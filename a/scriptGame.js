@@ -373,6 +373,7 @@ function initGame(callback) {
         
         window.addEventListener('resize', () => {
           syncTileSizeWithCell();
+          // updateTileFontSizes();
         });
 
 
@@ -633,7 +634,6 @@ function move_1(direction) {
               styleTile(toTile, newValue);
               setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
               addScore(newValue);
-              //checkWin(toCell);
               }, 150);
           } else {
             setTilePosition(fromTile, nr, nc);
@@ -783,6 +783,8 @@ function move(direction) {
         setTileSprite(fromTile.querySelector('.tile-sprite'), action.value);
         toCell.appendChild(fromTile);
 
+      })?.then(() => {
+        checkWin(game.grid[action.to.r][action.to.c]);
       });
 
     } else {
@@ -902,7 +904,6 @@ function spawnTile() {
       const t = tile.querySelector(".tile-inner.pop").classList.remove("pop");
     }, 150);
     //game.gridElement.appendChild(tile);
-    checkWin(game.grid[r][c]);
 }
 
 function checkWin(cell) {
@@ -916,16 +917,15 @@ function checkWin(cell) {
         const tile = cell.el;
         tile.classList.add("selected");
         setTimeout(() => {
-          tile.classList.remove("selected");
-        }, 2000);
-
-
+          cell.el.classList.remove("selected");
+        }, 500);
         
-        
-        const rect = tile.getBoundingClientRect();
-        playVictoryParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        // позиционируем в центре плитки;
+        const tileRect = tile.getBoundingClientRect();
+        const centerX = tileRect.left + tileRect.width / 2;
+        const centerY = tileRect.top + tileRect.height / 2;
 
-
+        playVictoryParticles(centerX, centerY);
 
     }
 }
@@ -1306,6 +1306,16 @@ function enterDestroyMode() {
   }, 50);
 }
 
+function getTilePosition(tileEl) {
+  const cellEl = tileEl.closest('.cell');
+  if (!cellEl) return null;
+
+  const row = parseInt(cellEl.dataset.row, 10);
+  const col = parseInt(cellEl.dataset.col, 10);
+
+  return { row, col, cellEl };
+}
+
 function handleDestroyClick(e) {
   
     let isDestroyMode = game.destroyMode;
@@ -1318,19 +1328,8 @@ function handleDestroyClick(e) {
     if (!tile) return;
   
     // Поиск координат плитки
-    let r = -1, c = -1;
-    for (let row = 0; row < game.gridSize; row++) {
-      for (let col = 0; col < game.gridSize; col++) {
-        if (game.grid[row][col]?.el === tile) {
-          r = row;
-          c = col;
-          break;
-        }
-      }
-      if (r !== -1) break;
-    }
-  
-    if (r === -1 || c === -1) return;
+    const tilePossition = getTilePosition(tile);
+    if (!tilePossition) return;
   
     // Подсчёт количества плиток на поле
     let tileCount = 0;
@@ -1353,6 +1352,11 @@ function handleDestroyClick(e) {
   
     pushToHistory(getSnapshotBoard());
   
+    game.grid[tilePossition.row][tilePossition.col] = null;
+    PlayerStatsManager.prepareChanges();
+
+    //-----------------------------------
+
     // Получаем координаты с учётом transform
     const originalTransform = tile.style.transform;
     tile.style.transform = "none";
@@ -1374,13 +1378,15 @@ function handleDestroyClick(e) {
     for (let i = 0; i < 15; i++) {
       const p = document.createElement('div');
       p.className = 'particle';
+      //p.style.background = ['gold', 'aqua', 'white', 'hotpink'][Math.floor(Math.random() * 4)];
+      p.style.boxShadow = `0 0 10px ${p.style.background}`;
       document.body.appendChild(p);
       
       p.style.top = centerX + 'px';
       p.style.left = centerY + 'px';
   
       const angle = Math.random() * Math.PI * 2;
-      const distance = 40 + Math.random() * 40;
+      const distance = 80 + Math.random() * 40;
       const dx = Math.cos(angle) * distance;
       const dy = Math.sin(angle) * distance;
   
@@ -1388,7 +1394,8 @@ function handleDestroyClick(e) {
         x: dx,
         y: dy,
         opacity: 0,
-        scale: 0.5 + Math.random(),
+        //scale: 0.5 + Math.random(),
+        scale: 1 + Math.random() * 1.5,
         duration: 0.8,
         ease: "power2.out",
         onComplete: () => p.remove()
@@ -1406,7 +1413,10 @@ function handleDestroyClick(e) {
             duration: 0.7,
             ease: "power3.in",
             onComplete: () => {
-              destroyTile(tile, r, c);
+              tile.style.display = "none";
+              tilePossition.cellEl.removeChild(tile);
+              tile.remove();
+
             }
           });
         }
@@ -1415,18 +1425,12 @@ function handleDestroyClick(e) {
   
     // Тряска
     gsap.fromTo(tile, 
-      { x: x - 30 }, 
-      { x: x + 30, yoyo: true, repeat: 5, duration: 0.04, ease: "power1.inOut", onComplete: () => {
-        gsap.to(tile, { x: x, duration: 0.05 });
+      { x: 0 - 30 }, 
+      { x: 0 + 30, yoyo: true, repeat: 5, duration: 0.04, ease: "power1.inOut", onComplete: () => {
+        gsap.to(tile, { x: 0, duration: 0.05 });
       }}
     );
   
-}
-
-function destroyTile(tileElement, r, c) {
-    game.gridElement.removeChild(tileElement);
-    game.grid[r][c] = null;
-    PlayerStatsManager.prepareChanges();
 }
 
 function exitDestroyMode() {
@@ -1498,7 +1502,7 @@ function exitSwapMode() {
   
     // Убираем подсветку
     game.selectedTiles.forEach(tile => {
-        const el = game.grid[tile.r][tile.c].el;
+        const el = game.grid[tile.row][tile.col].el;
         el.classList.remove("selected")
     });
     game.selectedTiles = [];
@@ -1511,25 +1515,13 @@ function handleSwapClick(e) {
         return;
     }
   
-    // Определяем координаты плитки
-    let r = -1, c = -1;
-    for (let row = 0; row < game.gridSize; row++) {
-      for (let col = 0; col < game.gridSize; col++) {
-        if (game.grid[row][col]?.el === tile) {
-          r = row;
-          c = col;
-          break;
-        }
-      }
-      if (r !== -1) break;
-    }
-  
-    if (r === -1 || c === -1) return;
+    const tilePosition = getTilePosition(tile);
+    if (!tilePosition) return;    
   
     // Проверка: уже выбрана эта же плитка?
-    if (game.selectedTiles.some(t => t.r === r && t.c === c)) return;
+    if (game.selectedTiles.some(t => t.row === tilePosition.row && t.col === tilePosition.col)) return;
   
-    game.selectedTiles.push({ r, c });
+    game.selectedTiles.push(tilePosition);
     tile.classList.add("selected");
   
     if (game.selectedTiles.length === 2) {
@@ -1541,35 +1533,49 @@ function handleSwapClick(e) {
         pushToHistory(getSnapshotBoard());
 
         const [first, second] = game.selectedTiles;
-        const tileA = game.grid[first.r][first.c];
-        const tileB = game.grid[second.r][second.c];
+        const tileA = game.grid[first.row][first.col];
+        const tileB = game.grid[second.row][second.col];
 
         if (!tileA || !tileB) return;
 
         const elA = tileA.el;
         const elB = tileB.el;
 
-        const posA = { x: first.c * game.cellSize + game.gap, y: first.r * game.cellSize + game.gap };
-        const posB = { x: second.c * game.cellSize + game.gap, y: second.r * game.cellSize + game.gap };
+        animateTileMovement(elA, second.cellEl, () => {
+          // После анимации: обновляем DOM
+          if (first.cellEl.contains(elA)) first.cellEl.removeChild(elA);
+          second.cellEl.appendChild(elA);
+        });
+
+        animateTileMovement(elB, first.cellEl, () => {
+          // После анимации: обновляем DOM
+          if (second.cellEl.contains(elB)) second.cellEl.removeChild(elB);
+          first.cellEl.appendChild(elB);
+          
+        });
+
+        // const posA = { x: first.c * game.cellSize + game.gap, y: first.r * game.cellSize + game.gap };
+        // const posB = { x: second.c * game.cellSize + game.gap, y: second.r * game.cellSize + game.gap };
 
         SoundManager.play("swap");
 
-        gsap.to(elA, {
-            x: posB.x + 'vmin',
-            y: posB.y + 'vmin',
-            duration: 0.3,
-            onComplete: () => setTilePosition(elA, second.r, second.c)
-        });
 
-        gsap.to(elB, {
-            x: posA.x + 'vmin',
-            y: posA.y + 'vmin',
-            duration: 0.3,
-            onComplete: () => setTilePosition(elB, first.r, first.c)
-        });
+        // gsap.to(elA, {
+        //     x: posB.x + 'vmin',
+        //     y: posB.y + 'vmin',
+        //     duration: 0.3,
+        //     onComplete: () => setTilePosition(elA, second.r, second.c)
+        // });
+
+        // gsap.to(elB, {
+        //     x: posA.x + 'vmin',
+        //     y: posA.y + 'vmin',
+        //     duration: 0.3,
+        //     onComplete: () => setTilePosition(elB, first.r, first.c)
+        // });
 
         // Обновляем grid
-        [game.grid[first.r][first.c], game.grid[second.r][second.c]] = [tileB, tileA];
+        [game.grid[first.row][first.col], game.grid[second.row][second.col]] = [tileB, tileA];
 
         elA.classList.remove("selected");
         elB.classList.remove("selected");
@@ -1866,21 +1872,26 @@ function musicOnPause(isActive = true) {
 function playVictoryParticles(x, y) {
   for (let i = 0; i < 50; i++) {
     const p = document.createElement('div');
-    p.className = 'win-particle';
+    p.className = 'particle';
     document.body.appendChild(p);
 
     p.style.left = `${x}px`;
     p.style.top = `${y}px`;
     p.style.background = `hsl(${Math.random() * 360}, 90%, 60%)`;
 
-    const dx = (Math.random() - 0.5) * 400;
-    const dy = (Math.random() - 0.5) * 400;
+    // const dx = (Math.random() - 0.5) * 400;
+    // const dy = (Math.random() - 0.5) * 400;
+      
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 40 + Math.random() * 40;
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance;
 
     gsap.to(p, {
       x: dx,
       y: dy,
-      scale: 0.5 + Math.random(),
       opacity: 0,
+      scale: 0.5 + Math.random(),
       duration: 0.5 + Math.random(),
       ease: 'power2.out',
       onComplete: () => p.remove()
@@ -1961,10 +1972,10 @@ function animateTileMovement(fromTile, toCell, onComplete) {
 
   // fromTile.style.display = "none";
   
-  gsap.to(animTile, {
+  return gsap.to(animTile, {
     x: endX - startX,
     y: endY - startY,
-    duration: 0.2,
+    duration: 0.25,
     ease: "power1.inOut",
     onComplete: () => {
       onComplete?.();
@@ -1972,5 +1983,17 @@ function animateTileMovement(fromTile, toCell, onComplete) {
       animTile.style.transform = "none";
       fromTile.style.display = "";
     }
+  });
+}
+
+
+function updateTileFontSizes() {
+  document.querySelectorAll('.tile').forEach(tile => {
+    const span = tile.querySelector('.tile-level span');
+    if (!span) return;
+
+    const tileSize = tile.offsetWidth;
+    const fontSize = tileSize * 0.35; // можешь варьировать от 0.3 до 0.5
+    span.style.fontSize = fontSize + 'px';
   });
 }
