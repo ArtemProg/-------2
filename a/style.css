@@ -22,6 +22,7 @@ html, body {
   scrollbar-width: none;
   touch-action: none;
   overscroll-behavior: none;
+  font-family: "Segoe UI", Arial, sans-serif;
 }
 
 body {
@@ -121,6 +122,12 @@ body::-webkit-scrollbar {
   /* flex: 1; */
   border-radius: 12px;
   padding: 2vmin;
+}
+
+@media (min-aspect-ratio: 7/10) and (max-aspect-ratio: 9/10) {
+  .grid-container {
+    width: 85%;
+  }
 }
 
 @media screen and (orientation: landscape), screen and (min-aspect-ratio: 4/5) {
@@ -647,7 +654,7 @@ body::-webkit-scrollbar {
 
 #go-watch-ad,
 #go-restart {
-  font-size: 3vmin;
+  font-size: 4.4vmin;
 }
 
 .settings-content button:hover {
@@ -667,7 +674,7 @@ body::-webkit-scrollbar {
 }
 
 .settings-cat {
-  width: 24vmin;
+  width: 15vmin;
   height: auto;
   animation: pulse-cat 2s infinite ease-in-out;
 }
@@ -738,4 +745,159 @@ body::-webkit-scrollbar {
   border-radius: 50%;
   pointer-events: none;
   z-index: 9999;
+}
+
+/* Отображать уровень (по умолчанию) */
+.game-container.display-level .tile::after,
+.game-container.display-level .animation-tile::after {
+  content: attr(data-level);
+}
+
+/* Отображать значение (2, 4, 8...) */
+.game-container.display-value .tile::after,
+.game-container.display-value .animation-tile::after {
+  content: attr(data-value);
+}
+
+.tile::after,
+.animation-tile::after {
+  position: absolute;
+  /* top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); */
+
+  font-size: 5vmin;
+  font-weight: bold;
+  color: white;
+  pointer-events: none;
+
+  background: rgba(109, 38, 38, 0.4);
+  padding: 0px 6px 0px 10px;
+  border-radius: 7px;
+  bottom: 0.9vmin;
+  right: 0.9vmin;
+  font-family: 'KenneyFuture', sans-serif;
+  font-size: 5vmin;
+  font-weight: bold;
+
+}
+
+.game-container.display-value .tile::after,
+.game-container.display-value .animation-tile::after {
+  font-weight: normal;
+  padding: 0px 0px 0px 7px;
+  bottom: 0.5vmin;
+  right: 0.5vmin;
+}
+
+.game-container div::after {
+  font-size: 4vmin;
+}
+
+.game-container.display-value .len-3::after,
+.game-container.display-value .len-4::after,
+.game-container.display-value .len-5::after { font-size: 3vmin; }
+.game-container.display-value .len-6::after { font-size: 2.7vmin; }
+
+@media (max-width: 768px) {
+
+  .game-container div::after {
+    font-size: 7vmin;
+  }
+
+  .game-container.display-value .len-1::after { font-size: 8vmin; }
+  .game-container.display-value .len-2::after,
+  .game-container.display-value .len-3::after { font-size: 7vmin; }
+  .game-container.display-value .len-4::after,
+  .game-container.display-value .len-5::after { font-size: 5vmin; }
+}
+
+/* селектор */
+
+.setting-row {
+  width: 100%;
+  /* display: flex;
+  align-items: center;
+  gap: 2vmin; */
+  font-size: 5vmin;
+  padding: 2vmin 4vmin;
+  background: radial-gradient(circle at center, #3b7b96,  #1972b1);
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  /* transition: background 0.2s ease; */
+}
+
+.select-wrapper {
+  position: relative;
+  width: 100%;
+  background: radial-gradient(circle at center, #3b7b96, #1972b1);
+  border-radius: 12px;
+  padding: 1.5vmin 4vmin;
+  overflow: hidden;
+  transition: background 0.2s ease;
+}
+
+.select-wrapper:hover {
+  background: linear-gradient(135deg, #023e8a, #03045e);
+}
+
+.select-wrapper select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  z-index: 2;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+#display-mode-fake {
+  display: block;
+  font-size: 5vmin;
+  font-weight: bold;
+  z-index: 1;
+  pointer-events: none;
+  background-image: linear-gradient(to bottom, #f9d976, #f39f86);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 2vmin;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  z-index: 1;
+  font-size: 4vmin;
+}
+
+@media screen and (min-aspect-ratio: 4/5) {
+
+  .settings-content button {
+    gap: 2vmin;
+    font-size: 4vmin;
+    padding: 1vmin 3vmin;
+  }
+
+  .setting-row {
+    font-size: 4vmin;
+    padding: 1vmin 3vmin;
+  }
+  
+  .select-wrapper {
+    font-size: 4vmin;
+    padding: 1vmin 3vmin;
+  }
+
+  
+#display-mode-fake {
+  font-size: 4vmin;
+}
+
 }

@@ -11,6 +11,10 @@
     "musicOn": "Music: On",
     "musicOff": "Music: Off",
 
+    "sound": "Sound",
+    "soundOn": "Sound: On",
+    "soundOff": "Sound: Off",
+
     "title-game-over-1": "No available moves",
     "title-game-over-2": "But you can continue!",
 
@@ -18,7 +22,7 @@
 
     "randomNoCurrencyPhrases": [
         "Meow... Kitty is out of gems!",
-        "Hey! You're out of gems 🥺",
+        "Hey! You're out of gems",
         "Want to keep going? Kitty would love more gems!",
         "Time to refill the kitty’s stash of shinies!",
         "Kitty is sad without gems...",
@@ -39,6 +43,11 @@
     ],
 
     "destroyInstruction": "Choose a tile to smash",
-    "swapInstruction": "Tap two tiles to swap them"
+    "swapInstruction": "Tap two tiles to swap them",
+
+    "displayModeLabel": "Tile Numbers:",
+    "displayModeLevel": "Level (1, 2, 3...)",
+    "displayModeValue": "2048 Style (2, 4, 8...)"
+    
   }
   

@@ -47,6 +47,8 @@ const PlayerStatsManager = {
             currency: game.currency,
             bestScore: game.bestScore,
             hasEnteredBefore: true,
+            playDays: game.playDays,
+            displayMode: game.displayMode,
             lastClaimDate: game.lastClaimDate,
             lastDailyReward: game.lastDailyReward,
             currentGame: {
@@ -198,8 +200,8 @@ const SoundManager = {
     if (!enable) this.pause("bg");
   },
 
-  toggle(enable) {
-    this.enabled = enable;
+  toggleSound(enable) {
+    this.effectsEnabled = enable;
     if (!enable) {
       for (const s of Object.values(this.sounds)) {
         s.pause();
@@ -217,6 +219,12 @@ const game = {
     tileSize: 0,
     cellSize: 0,
     gridSize: 4,
+
+    typeModes: {
+      level: "level",
+      value: "value"
+    },
+    displayMode: null,
 
     highestLevelReached: 2,
 
@@ -236,6 +244,7 @@ const game = {
     isMusicOn: false,
     musicReady: false,
     musicStarted: false,
+    isSoundOn: false,
 
     swapMode: false,
     destroyMode: false,
@@ -250,8 +259,10 @@ const game = {
     score: 0,
     lastClaimDate: null,
     lastDailyReward: null,
+    playDays: 0,
 
     player: {},
+    isAuthorized: false,
 
     log2Cache: {},
     colorCache: {},
@@ -269,12 +280,12 @@ const game = {
 
     dailyReward: 395,
     videoReward: 250,
-    undoPrice: 110,
-    destroyPrice: 100,
-    swapPrice: 120,
+    undoPrice: 130,
+    destroyPrice: 120,
+    swapPrice: 150,
     currencyStart: 100,
 
-    intervalSmartAd: 3000,
+    intervalSmartAd: 3 * 60 * 1000,
 
 };
 
@@ -299,7 +310,7 @@ window.addEventListener("load", () => {
 
           setInterval(() => {
             tryShowSmartAd("auto");
-          }, game.intervalSmartAd);
+          }, 5000);
 
         });
       });
@@ -321,13 +332,16 @@ function initGame(callback) {
     initDefaultSettings();
 
     game.isMusicOn = localStorage.getItem("music") !== "false";
+    game.isSoundOn = localStorage.getItem("sound") !== "false";
     game.lastAdTimestamp = Number(localStorage.getItem("lastAdTimestamp") || 0);
 
     updateLabelMusic();
+    updateLabelSound();
     
     return ysdk.getPlayer().then(_player => {
         game.player = _player;
-        return loadCloudSave();
+        game.isAuthorized = (_player.getMode() !== 'lite');
+        return game.isAuthorized ? loadCloudSave() : null;
     }).catch(err => {
         // Ошибка при инициализации объекта Player.
         game.player = {};
@@ -349,20 +363,26 @@ function initGame(callback) {
                 spawnTile();
                 spawnTile();
             }, 200);
-            if (!game.hasEnteredBefore) {
-                game.currency = game.currencyStart;
-                game.hasEnteredBefore = true;
-            }
         }
 
-        SoundManager.load("bg", ["sound/music.m4a", "sound/music.mp3"], true);
-        // SoundManager.load("merge", ["sound/merge.m4a", "sound/merge.mp3"]);
-        // SoundManager.load("swap", ["sound/swap.m4a", "sound/swap.mp3"]);
-        // SoundManager.load("destroy", ["sound/destroy.m4a", "sound/destroy.mp3"]);
+        if (!game.hasEnteredBefore) {
+          game.currency = game.currencyStart;
+          game.hasEnteredBefore = true;
+          game.playDays = 1
+        } else {
+          const today = new Date().toISOString().split("T")[0];
+          const lastClaimDate = game.lastClaimDate.toISOString().split("T")[0];
+          if (lastClaimDate !== today) {
+            game.playDays = (game.playDays || 1) + 1;
+          }
+        }
+
+        SoundManager.load("bg", ["sound/music.mp3"], true);
         SoundManager.load("destroy", ["sound/destroy.mp3"]);
         SoundManager.load("swap", ["sound/swap.mp3"]);
         SoundManager.load("undo", ["sound/undo.mp3"]);
         SoundManager.load("levelUp", ["sound/levelUp.mp3"]);
+        SoundManager.load("succes", ["sound/succes.mp3"]);
         
         SoundManager.sounds["bg"].addEventListener("canplaythrough", () => {
           game.musicReady = true;
@@ -388,6 +408,7 @@ function initGame(callback) {
         document.getElementById("new-game-btn").addEventListener("click", restartGame);
         document.getElementById("watch-ad-btn").addEventListener("click", () => showAdsVideo("settings"));
         document.getElementById("toggle-music-btn").addEventListener("click", toggleMusic);
+        document.getElementById("toggle-sound-btn").addEventListener("click", toggleSound);
         document.getElementById("close-settings-btn").addEventListener("click", closeSettingsOverlay);
 
         // Навешиваем на первое взаимодействие
@@ -395,6 +416,14 @@ function initGame(callback) {
         window.addEventListener("touchstart", tryStartMusic);
         window.addEventListener("keydown", tryStartMusic);
         document.body.addEventListener('click', tryStartMusic, { once: true });
+
+
+        document.getElementById('display-mode').addEventListener('change', (e) => {
+          const mode = e.target.value;
+
+          setDisplayMode(mode);
+        });
+
 
         game.lastClaimDate = new Date();
 
@@ -426,6 +455,8 @@ function loadCloudSave() {
             if (state.currency) game.currency = state.currency;
             if (state.bestScore) game.bestScore = state.bestScore;
             if (state.hasEnteredBefore) game.hasEnteredBefore = state.hasEnteredBefore;
+            if (state.playDays) game.playDays = state.playDays;
+            if (state.displayMode) setDisplayMode(state.displayMode);
 
             if (state.lastClaimDate) game.lastClaimDate = new Date(state.lastClaimDate);
             if (state.lastDailyReward) game.lastDailyReward = new Date(state.lastDailyReward);
@@ -442,15 +473,21 @@ function loadCloudSave() {
                             const tile = document.createElement("div");
                             tile.className = "tile";
                             tile.innerHTML = `
-                            <div class="tile-inner">
+                              <div class="tile-inner">
                                 <div class="tile-sprite"></div>
-                                <div class="tile-level"><span>${getLevel(cell.value)}</span></div>
-                            </div>`;
+                                <div class="tile-level"></div>
+                              </div>`;
+                            tile.dataset.value = cell.value;
+                            tile.dataset.level = getLevel(cell.value);
+
+                            updateFontSize(tile, cell.value);
+
                             game.grid[r][c] = { el: tile, value: cell.value };
                             setTilePosition(tile, r, c);
                             styleTile(tile, cell.value);
                             setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
                             // game.gridElement.appendChild(tile);
+
                         }
                     }
                 }
@@ -495,6 +532,7 @@ function initDefaultSettings() {
     game.score = 0;
     game.currency = 0;
     game.hasEnteredBefore = false;
+    game.playDays = 0;
     game.historyStack = [];
     game.isPlaying = false;
     game.isPaused = false;
@@ -504,6 +542,9 @@ function initDefaultSettings() {
     game.lastClaimDate = new Date();
     game.lastAdTimestamp = 0;
     game.lastInteractionTime = null;
+
+    setDisplayMode(game.typeModes.value);
+
 }
 
 function startGame() {
@@ -571,102 +612,6 @@ function showLevelUpPopup(level) {
 }
 
 //-------------------------------------
-
-function move_1(direction) {
-    
-    if (!game.isPlaying) return;
-  
-    const snapshotBoard = getSnapshotBoard();
-  
-    let moved = false;
-    const dir = {
-      ArrowUp: { x: 0, y: -1 },
-      ArrowDown: { x: 0, y: 1 },
-      ArrowLeft: { x: -1, y: 0 },
-      ArrowRight: { x: 1, y: 0 },
-    }[direction];
-    if (!dir) return;
-    const range = [...Array(game.gridSize).keys()];
-    const iterate = (dir.x > 0 || dir.y > 0) ? range.reverse() : range;
-    const merged = Array.from({ length: game.gridSize }, () => Array(game.gridSize).fill(false));
-    let currency = 0;
-    for (let r of iterate) {
-      for (let c of iterate) {
-        const cell = game.grid[r][c];
-        if (!cell) continue;
-        let nr = r, nc = c;
-        while (true) {
-          const tr = nr + dir.y, tc = nc + dir.x;
-          if (tr < 0 || tr >= game.gridSize || tc < 0 || tc >= game.gridSize) break;
-          if (!game.grid[tr][tc]) {
-            nr = tr;
-            nc = tc;
-          } else if (game.grid[tr][tc].value === cell.value && !merged[tr][tc]) {
-            nr = tr;
-            nc = tc;
-            merged[nr][nc] = true;
-            break;
-          } else break;
-        }
-        if (nr !== r || nc !== c) {
-          moved = true;
-          const fromTile = cell.el;
-
-          // 1. Отобразить клон
-          // 2. скрыть оригинал
-          // 3. подготовить к показу конечную ячейку
-
-          const toCellDOM = document.querySelector(`.cell[data-row="${nr}"][data-col="${nc}"]`);
-          const toCell = game.grid[nr][nc];
-
-          if (toCell) {
-            const toTile = toCell.el;
-            const newValue = toCell.value * 2;
-            currency += Math.round(getLevel(toCell.value)/4);
-            game.grid[r][c] = null;
-            setTimeout(() => {
-              toCell.value = newValue;
-              toTile.innerHTML = `
-                  <div class="tile-inner pop">
-                    <div class="tile-sprite"></div>
-                    <div class="tile-level"><span>${getLevel(newValue)}</span></div>
-                  </div>`;
-              styleTile(toTile, newValue);
-              setTileSprite(toTile.querySelector('.tile-sprite'), newValue);
-              addScore(newValue);
-              }, 150);
-          } else {
-            setTilePosition(fromTile, nr, nc);
-            game.grid[nr][nc] = cell;
-            game.grid[r][c] = null;
-          }
-          
-          animateTileMovement(fromTile, game.grid[r][c], toCellDOM, () => {
-            // После анимации: обновляем DOM
-            const oldCell = document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
-            const newCell = toCellDOM;
-            if (oldCell.contains(fromTile)) oldCell.removeChild(fromTile);
-            newCell.appendChild(fromTile);
-          });
-
-          
-          
-        }
-      }
-    }
-    if (moved) {
-        setTimeout(() => {
-            game.currency += currency;
-            updateCurrencyDisplay();
-            spawnTile();
-            pushToHistory(snapshotBoard);
-            PlayerStatsManager.prepareChanges();
-            checkGameOver();
-        }, 250);
-    } else {
-      checkGameOver();
-    }
-}
 
 // функция формирования действий без изменения DOM
 function computeActions(direction) {
@@ -771,10 +716,14 @@ function move(direction) {
 
         fromTile.className = "tile";
         fromTile.innerHTML = `
-        <div class="tile-inner pop">
-          <div class="tile-sprite"></div>
-          <div class="tile-level"><span>${getLevel(action.value)}</span></div>
-        </div>`;
+          <div class="tile-inner pop">
+            <div class="tile-sprite"></div>
+            <div class="tile-level"></div>
+          </div>`;
+        fromTile.dataset.value = action.value;
+        fromTile.dataset.level = getLevel(action.value);
+
+        updateFontSize(fromTile, action.value);
 
         setTimeout(() => {
           fromTile.querySelector(".tile-inner.pop").classList.remove("pop");
@@ -785,6 +734,7 @@ function move(direction) {
         toCell.appendChild(fromTile);
 
       })?.then(() => {
+        addScore(action.value);
         checkWin(game.grid[action.to.r][action.to.c], paramWin);
       });
 
@@ -888,14 +838,19 @@ function spawnTile() {
     }
     if (empty.length === 0) return;
     const { r, c } = empty[Math.floor(Math.random() * empty.length)];
+    const value = Math.random() < 0.9 ? 2 : 4;
     const tile = document.createElement("div");
     tile.className = "tile";
-    const value = Math.random() < 0.9 ? 2 : 4;
     tile.innerHTML = `
       <div class="tile-inner pop">
         <div class="tile-sprite"></div>
-        <div class="tile-level"><span>${getLevel(value)}</span></div>
+        <div class="tile-level"></div>
       </div>`;
+    tile.dataset.value = value;
+    tile.dataset.level = getLevel(value);
+
+    updateFontSize(tile, value);
+
     game.grid[r][c] = { el: tile, value };
     setTilePosition(tile, r, c);
     styleTile(tile, value);
@@ -1219,6 +1174,13 @@ function tryStartMusic() {
   window.removeEventListener("keydown", tryStartMusic);
 }
 
+function tryStartSound() {
+  if (!game.isSoundOn) return;
+
+  SoundManager.play("succes");
+
+}
+
 //------------------------------------------
 
 function getSnapshotBoard() {
@@ -1275,13 +1237,19 @@ function undoMove() {
           tile.innerHTML = `
             <div class="tile-inner">
               <div class="tile-sprite"></div>
-              <div class="tile-level"><span>${getLevel(cell.value)}</span></div>
+              <div class="tile-level"></div>
             </div>`;
+          tile.dataset.value = cell.value;
+          tile.dataset.level = getLevel(cell.value);
+
+          updateFontSize(tile, cell.value);
+
           game.grid[r][c] = { el: tile, value: cell.value };
           setTilePosition(tile, r, c);
           styleTile(tile, cell.value);
           setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
           // game.gridElement.appendChild(tile);
+
         }
       }
     }
@@ -1597,7 +1565,7 @@ function handleSwapClick(e) {
 
 function showAdsVideo(source = "game") {
 
-  const rewardAmount = 415;
+  const rewardAmount = game.videoReward;
 
   if (source === "settings") {
     closeSettingsOverlay();
@@ -1657,6 +1625,7 @@ function updateLangTexts() {
   document.getElementById("new-game-btn").querySelector('span').textContent = t("newGame");
   document.getElementById("watch-ad-btn").querySelector('span').textContent = t("getGems");
   document.getElementById("toggle-music-btn").querySelector('span').textContent = t("music");
+  document.getElementById("toggle-sound-btn").querySelector('span').textContent = t("sound");
   document.getElementById("close-settings-btn").querySelector('span').textContent = t("continue");
   
   document.getElementById("go-destroy").querySelector('span').textContent = t("destroy");
@@ -1676,6 +1645,10 @@ function updateLangTexts() {
   game.destroyPanel.querySelector('p').textContent = t("destroyInstruction");
   game.swapPanel.querySelector('p').textContent = t("swapInstruction");
   
+  document.getElementById("display-mode-label").textContent = t("displayModeLabel");
+  document.getElementById("display-mode-level").textContent = t("displayModeLevel");
+  document.getElementById("display-mode-value").textContent = t("displayModeValue");
+
   document.getElementById("ad-button").querySelector('span').textContent = `+${game.videoReward}`;
   document.getElementById("undo-button").querySelector('span').textContent = game.undoPrice;
   document.getElementById("destroy-button").querySelector('span').textContent = game.destroyPrice;
@@ -1729,12 +1702,34 @@ function toggleMusic() {
     }
 }
 
-function updateLabelMusic() {
-    const musicText = document.getElementById("music-text");
-    musicText.textContent = game.isMusicOn ? t("musicOn") : t("musicOff");
+function toggleSound() {
+    
+  game.isSoundOn = !game.isSoundOn;
 
-    const musicIcon = document.getElementById("music-icon");
-    musicIcon.src = game.isMusicOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
+  localStorage.setItem("sound", game.isSoundOn); // сохраним настройку
+  
+  updateLabelSound();
+
+  SoundManager.toggleSound(game.isSoundOn);
+  if (game.isSoundOn) {
+    tryStartSound();
+  }
+}
+
+function updateLabelMusic() {
+    const textEl = document.getElementById("music-text");
+    textEl.textContent = game.isMusicOn ? t("musicOn") : t("musicOff");
+
+    const iconEl = document.getElementById("music-icon");
+    iconEl.src = game.isMusicOn ? "images/icon_music_on.png" : "images/icon_music_off.png";
+}
+
+function updateLabelSound() {
+  const textEl = document.getElementById("sound-text");
+  textEl.textContent = game.isSoundOn ? t("soundOn") : t("soundOff");
+
+  const iconEl = document.getElementById("sound-icon");
+  iconEl.src = game.isSoundOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
 }
 
 function checkDailyReward() {
@@ -1764,8 +1759,8 @@ function showRewardPopup(message, callback) {
   const popup = document.createElement("div");
   popup.className = "level-up-popup";
   popup.innerHTML = `
-        <img src="images/diamond.png" />
-        <p>${message}</p>
+    <img src="images/diamond.png" />
+    <p>${message}</p>
   `;
   document.body.appendChild(popup);
 
@@ -1787,17 +1782,31 @@ function showRewardPopup(message, callback) {
 
 function tryShowSmartAd(trigger = "auto") {
   const now = Date.now();
-  const minutes5 = 5 * 60 * 1000;
 
-  const enoughTimePassed = now - game.lastAdTimestamp >= minutes5;
+  const deltaTime = now - game.lastAdTimestamp;
+
+  const enoughTimePassed = deltaTime >= game.intervalSmartAd;
 
   if (!enoughTimePassed) return;
-
   //const playerIdle = now - game.lastInteractionTime >= 5000;
 
   const isAuto = trigger === "auto";
   const isStartup = trigger === "startup";
   const isNewGame = trigger === "newgame";
+
+  if (isAuto) {
+    if (deltaTime < game.intervalSmartAd) return;
+    if (game.destroyMode || game.swapMode) return;
+    if (game.isAuthorized && game.playDays < 5) {
+      if (game.playDays === 4 && (deltaTime < game.intervalSmartAd + 60_000)) return;
+      if (game.playDays === 3 && (deltaTime < game.intervalSmartAd + 120_000)) return;
+      if (game.playDays === 2 && (deltaTime < game.intervalSmartAd + 180_000)) return;
+      if (deltaTime < game.intervalSmartAd + 240_000) return;
+    }
+  } else {
+    if (isStartup && deltaTime < 240_000) return;
+    if (isNewGame && deltaTime < 60_000) return;
+  }
 
   if (isStartup || isNewGame || isAuto) {
     showFullscreenAd();
@@ -1813,14 +1822,13 @@ function showFullscreenAd(callbackAfterAd = null) {
     callbacks: {
       onOpen: () => {
         console.log("📺 Реклама открыта");
+        musicOnPause(true);
       },
       onClose: (wasShown) => {
         console.log("📺 Закрыта. Показана:", wasShown);
         if (wasShown) {
           game.lastAdTimestamp = Date.now();
-          setTimeout(() => {
-            // syncTileSizeWithCell();
-          }, 150);
+          musicOnPause(false);
         }
         if (callbackAfterAd) callbackAfterAd?.();
       },
@@ -1935,6 +1943,8 @@ function cleanAnimationTile(tile) {
   tile.style.top = "0";
   tile.style.left = "0";
   tile.style.display = "none";
+  tile.dataset.value = "";
+  tile.dataset.level = "";
 }
 
 function animateTileMovement(fromTile, toCell, onComplete) {
@@ -1958,6 +1968,10 @@ function animateTileMovement(fromTile, toCell, onComplete) {
   animTile.style.fontSize = fromTile.style.fontSize;
 
   animTile.style.transform = "none";
+
+  animTile.dataset.value = fromTile.dataset.value;
+  animTile.dataset.level = fromTile.dataset.level;
+  updateFontSize(animTile, fromTile.dataset.value);
 
   gsap.set(animTile, {
     x: 0,
@@ -2005,4 +2019,30 @@ function updateTileFontSizes() {
     const fontSize = tileSize * 0.35; // можешь варьировать от 0.3 до 0.5
     span.style.fontSize = fontSize + 'px';
   });
+}
+
+
+function setDisplayMode(mode) {
+
+  const label = document.querySelector(`#display-mode option[value="${mode}"]`).textContent;
+  document.getElementById('display-mode-fake').textContent = label;
+  
+  const root = document.querySelector('.game-container');
+  root.classList.remove('display-level', 'display-value');
+  root.classList.add('display-' + mode);
+  game.displayMode = mode;
+}
+
+function updateFontSize(tileElement, number) {
+  const length = number.toString().length;
+
+  // Удаляем старые классы len-1, len-2, ..., len-5
+  tileElement.classList.forEach(cls => {
+    if (cls.startsWith('len-')) {
+      tileElement.classList.remove(cls);
+    }
+  });
+
+  // Добавляем актуальный класс
+  tileElement.classList.add(`len-${length}`);
 }
