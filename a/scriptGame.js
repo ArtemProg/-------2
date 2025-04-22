@@ -2023,13 +2023,20 @@ function updateTileFontSizes() {
 
 
 function setDisplayMode(mode) {
-
+  const select = document.getElementById('display-mode');
   const label = document.querySelector(`#display-mode option[value="${mode}"]`).textContent;
-  document.getElementById('display-mode-fake').textContent = label;
   
+  // Обновляем отображаемый текст
+  document.getElementById('display-mode-fake').textContent = label;
+
+  // Устанавливаем выбранное значение в списке
+  select.value = mode;
+  
+  // Применяем класс для отображения уровня или значения
   const root = document.querySelector('.game-container');
   root.classList.remove('display-level', 'display-value');
   root.classList.add('display-' + mode);
+  
   game.displayMode = mode;
 }
 
