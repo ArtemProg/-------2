@@ -9,6 +9,22 @@
   box-sizing: border-box;
 }
 
+*, *::before, *::after {
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+html, body {
+  -webkit-touch-callout: none; /* запретить удержание на iOS */
+  -webkit-user-drag: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+button, img, canvas, div {
+  -webkit-touch-callout: none;
+}
 
 html, body {
   margin: 0;
@@ -900,4 +916,14 @@ body::-webkit-scrollbar {
   font-size: 4vmin;
 }
 
+}
+
+.heart {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background-image: url("images/heart.png");
+  background-size: cover;
+  pointer-events: none;
+  z-index: 1000;
 }

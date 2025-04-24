@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Сердечки GSAP</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      
+    }
+    .heart {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background-image: url("https://cdn-icons-png.flaticon.com/512/833/833472.png");
+      background-size: cover;
+      pointer-events: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+
+<script>
+  function burstHearts(duration = 2000, rate = 60) {
+    const start = performance.now();
+
+    function createHeart() {
+      const now = performance.now();
+      if (now - start > duration) return;
+
+      const heart = document.createElement('div');
+      heart.className = 'heart';
+      heart.style.left = Math.random() * window.innerWidth + 'px';
+      heart.style.top = '-30px';
+      document.body.appendChild(heart);
+
+      gsap.to(heart, {
+        y: window.innerHeight + 50,
+        x: `+=${Math.random() * 100 - 50}`,
+        rotation: Math.random() * 360,
+        opacity: 0,
+        duration: 2 + Math.random(),
+        ease: 'power1.out',
+        onComplete: () => heart.remove()
+      });
+
+      setTimeout(createHeart, 1000 / rate);
+    }
+
+    createHeart();
+  }
+
+  // Запуск при загрузке
+  window.onload = () => {
+    burstHearts(3000, 100); // 2 секунды, 100 сердечек в секунду
+  };
+</script>
+
+</body>
+</html>

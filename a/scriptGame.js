@@ -1,5 +1,7 @@
 let ysdk;
 
+window.addEventListener("contextmenu", e => e.preventDefault());
+
 const PlayerStatsManager = {
     pendingStats: {},
     saveTimeout: null,
@@ -68,17 +70,25 @@ const PlayerStatsManager = {
      * Выполняет сохранение данных в Yandex SDK
      */
     save() {
-      if (!ysdk || !ysdk.getPlayer) return;
-  
-      ysdk.getPlayer().then(player => {
-        return player.setData(this.pendingStats);
-      }).then(() => {
-        console.log("✅ Данные игрока сохранены:", this.pendingStats);
-        this.pendingStats = {};
-        this.lastSaveTime = Date.now();
-      }).catch(err => {
-        console.error("❌ Ошибка при сохранении данных:", err);
-      });
+      if (game.isAuthorized) {
+        
+        if (!ysdk || !ysdk.getPlayer) return;
+    
+        ysdk.getPlayer().then(player => {
+          return player.setData(this.pendingStats);
+        }).then(() => {
+          console.log("✅ Данные игрока сохранены:", this.pendingStats);
+          this.pendingStats = {};
+          this.lastSaveTime = Date.now();
+        }).catch(err => {
+          console.error("❌ Ошибка при сохранении данных:", err);
+        });
+
+      } else {
+
+        localStorage.setItem('progress', JSON.stringify(this.pendingStats));
+
+      }
     },
 
     forceSave() {
@@ -88,26 +98,9 @@ const PlayerStatsManager = {
     },
 
     trySubmitScore(score) {
-      ysdk.getPlayer().then(player => {
-        // Проверяем, авторизован ли игрок
-        if (player.getMode() === 'lite') {
-          // console.log('Игрок не авторизован. Запрашиваем авторизацию...');
-          // ysdk.auth.openAuthDialog().then(() => {
-          //   console.log('Игрок авторизован после диалога');
-          //   submitScore(score); // Отправляем очки
-          // }).catch(() => {
-          //   console.warn('Игрок отказался от авторизации. Очки не будут отправлены.');
-          // });
-        } else {
-          console.log('Игрок уже авторизован');
-          this.submitScore(score);
-        }
-      }).catch(err => {
-        console.error('Ошибка получения игрока:', err);
-      });
-    },
 
-    submitScore(score) {
+      if (!game.isAuthorized) return;
+
       const now = Date.now();
     
       if (now - this.lastSubmitTime < this.SUBMIT_DELAY) {
@@ -137,6 +130,7 @@ const SoundManager = {
 
   load(name, sources, loop = false) {
     const audio = document.createElement("audio");
+    audio.style.display = "none";
 
     for (const src of sources) {
       const type = this.getMimeType(src);
@@ -293,27 +287,41 @@ window.addEventListener("load", () => {
     YaGames.init().then(sdk => {
       ysdk = sdk;
   
-      game.lang = ysdk.environment.i18n.lang;
-      game.currentLang = game.lang && game.langs.includes(game.lang) 
-        ? game.lang
-        : game.langs.includes[0];
+      return ysdk.getStorage()
+      .then(safeStorage => {
 
-      document.documentElement.lang = game.currentLang;
+            Object.defineProperty(window, 'localStorage', { get: () => safeStorage });
 
-      loadingResources(() => {
-        updateLangTexts();
-        initGame(() => {
+            localStorage.setItem('key', 'safe storage is working');
+            console.log(localStorage.getItem('key'));
 
-          checkDailyReward();
-          PlayerStatsManager.prepareChanges();
-          tryShowSmartAd("startup");
 
-          setInterval(() => {
-            tryShowSmartAd("auto");
-          }, 5000);
+            game.lang = ysdk.environment.i18n.lang;
+            game.currentLang = game.lang && game.langs.includes(game.lang) 
+              ? game.lang
+              : game.langs.includes[0];
+      
+            document.documentElement.lang = game.currentLang;
+      
+            loadingResources(() => {
+              updateLangTexts();
+              initGame(() => {
+      
+                gameReady();
 
+                checkDailyReward();
+                PlayerStatsManager.prepareChanges();
+                tryShowSmartAd("startup");
+      
+                setInterval(() => {
+                  tryShowSmartAd("auto");
+                }, 5000);
+      
+              });
+            });
+
+            
         });
-      });
       
     });
 })
@@ -347,6 +355,12 @@ function initGame(callback) {
         game.player = {};
     }).then(() => {
         
+      if (game.isAuthorized) return true;
+
+      return loadLocalStorage();
+
+    }).then(() => {
+
         let isEmpty = true;
         for (let r = 0; r < game.gridSize; r++) {
             for (let c = 0; c < game.gridSize; c++) {
@@ -447,64 +461,75 @@ function closeSettingsOverlay() {
 }
 
 function loadCloudSave() {
-
-    return game.player.getData().then(data => {
-        const state = data;
-        if (state) {
-          
-            if (state.currency) game.currency = state.currency;
-            if (state.bestScore) game.bestScore = state.bestScore;
-            if (state.hasEnteredBefore) game.hasEnteredBefore = state.hasEnteredBefore;
-            if (state.playDays) game.playDays = state.playDays;
-            if (state.displayMode) setDisplayMode(state.displayMode);
-
-            if (state.lastClaimDate) game.lastClaimDate = new Date(state.lastClaimDate);
-            if (state.lastDailyReward) game.lastDailyReward = new Date(state.lastDailyReward);
-
-            if (state.currentGame) {
-                const currentGame = state.currentGame;
-                game.score = currentGame.score;
-                game.highestLevelReached = currentGame.highestLevelReached;
-
-                for (let r = 0; r < game.gridSize; r++) {
-                    for (let c = 0; c < game.gridSize; c++) {
-                        const cell = currentGame.grid[r][c];
-                        if (cell) {
-                            const tile = document.createElement("div");
-                            tile.className = "tile";
-                            tile.innerHTML = `
-                              <div class="tile-inner">
-                                <div class="tile-sprite"></div>
-                                <div class="tile-level"></div>
-                              </div>`;
-                            tile.dataset.value = cell.value;
-                            tile.dataset.level = getLevel(cell.value);
-
-                            updateFontSize(tile, cell.value);
-
-                            game.grid[r][c] = { el: tile, value: cell.value };
-                            setTilePosition(tile, r, c);
-                            styleTile(tile, cell.value);
-                            setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
-                            // game.gridElement.appendChild(tile);
-
-                        }
-                    }
-                }
-
-                const tempHistory = (currentGame.history || []).map(entry => ({
-                    score: entry.score,
-                    highestLevelReached: entry.highestLevelReached,
-                    grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
-                }));
-                game.historyStack.length = 0;
-                game.historyStack.push(...tempHistory);
-            }
-          
-        } else {
-          
-        }
+    return game.player.getData().then(gameData => {
+        loadStateGame(gameData);
+        return !!gameData;
     });
+}
+
+function loadLocalStorage() {
+  return new Promise((resolve, reject) => { 
+    const saved = localStorage.getItem('progress');
+    if (saved) {
+      const gameData = JSON.parse(saved);
+      loadStateGame(gameData);
+    }
+    resolve(saved);
+  });
+}
+
+function loadStateGame(state) {
+
+  if (!state) return;
+          
+  if (state.currency) game.currency = state.currency;
+  if (state.bestScore) game.bestScore = state.bestScore;
+  if (state.hasEnteredBefore) game.hasEnteredBefore = state.hasEnteredBefore;
+  if (state.playDays) game.playDays = state.playDays;
+  if (state.displayMode) setDisplayMode(state.displayMode);
+
+  if (state.lastClaimDate) game.lastClaimDate = new Date(state.lastClaimDate);
+  if (state.lastDailyReward) game.lastDailyReward = new Date(state.lastDailyReward);
+
+  if (state.currentGame) {
+      const currentGame = state.currentGame;
+      game.score = currentGame.score;
+      game.highestLevelReached = currentGame.highestLevelReached;
+
+      for (let r = 0; r < game.gridSize; r++) {
+          for (let c = 0; c < game.gridSize; c++) {
+              const cell = currentGame.grid[r][c];
+              if (cell) {
+                  const tile = document.createElement("div");
+                  tile.className = "tile";
+                  tile.innerHTML = `
+                    <div class="tile-inner">
+                      <div class="tile-sprite"></div>
+                      <div class="tile-level"></div>
+                    </div>`;
+                  tile.dataset.value = cell.value;
+                  tile.dataset.level = getLevel(cell.value);
+
+                  updateFontSize(tile, cell.value);
+
+                  game.grid[r][c] = { el: tile, value: cell.value };
+                  setTilePosition(tile, r, c);
+                  styleTile(tile, cell.value);
+                  setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
+                  // game.gridElement.appendChild(tile);
+
+              }
+          }
+      }
+
+      const tempHistory = (currentGame.history || []).map(entry => ({
+          score: entry.score,
+          highestLevelReached: entry.highestLevelReached,
+          grid: entry.grid.map(row => row.map(cell => (cell ? { value: cell.value } : null)))
+      }));
+      game.historyStack.length = 0;
+      game.historyStack.push(...tempHistory);
+  }
 
 }
 
@@ -662,7 +687,7 @@ function computeActions(direction) {
         actions.push({ from: next, from2: current, to: { r, c }, value: current.value * 2 });
 
         newLine.push({ value: current.value * 2 });
-        currency += Math.round(getLevel(current.value * 2) / 4);
+        currency += Math.round(getLevel(current.value) / 4);
         i += 2;
         moved = true;
       } else {
@@ -863,6 +888,8 @@ function spawnTile() {
 }
 
 function checkWin(cell, paramWin) {
+    if (!cell) return;
+
     const level = getLevel(cell.value);
     
     if (level > 3) {
@@ -891,6 +918,9 @@ function checkWin(cell, paramWin) {
     if (level > game.highestLevelReached) {
       game.highestLevelReached = level;
       if (level > 6) showLevelUpPopup(level);
+      
+      if (cell.value >= 2048) burstSprites();
+      if (cell.value >= 2048) burstSprites({ spriteUrl: "🌸", width: 32 });
     }
 }
 
@@ -1424,8 +1454,8 @@ function updateHelperPanel(panelId) {
   
     const path = `images/helper_${helperNumber}.png`;
     const cachedImage = game.preloaderImages[path];
-    if (game.cachedImage && img) {
-        img.src = game.cachedImage.src;
+    if (cachedImage && img) {
+        img.src = cachedImage.src;
     }
 }
 
@@ -1447,6 +1477,7 @@ function enterSwapMode() {
   }
 
   game.swapMode = true;
+  updateHelperPanel("swap-mode-panel");
   game.selectedTiles = [];
   game.swapPanel.classList.remove("hidden");
 
@@ -1730,6 +1761,10 @@ function updateLabelSound() {
 
   const iconEl = document.getElementById("sound-icon");
   iconEl.src = game.isSoundOn ? "images/icon_sound_on.png" : "images/icon_sound_off.png";
+}
+
+function gameReady() {
+  ysdk.features.LoadingAPI?.ready();
 }
 
 function checkDailyReward() {
@@ -2052,4 +2087,53 @@ function updateFontSize(tileElement, number) {
 
   // Добавляем актуальный класс
   tileElement.classList.add(`len-${length}`);
+}
+
+function burstSprites({ 
+  spriteUrl = "❤️",     // можно emoji или ссылку
+  duration = 2000,
+  rate = 80,
+  width = 24,
+  height = 24
+} = {}) {
+  const start = performance.now();
+
+  function createSprite() {
+    const now = performance.now();
+    if (now - start > duration) return;
+
+    const el = document.createElement('div');
+    el.className = 'effect-sprite';
+    el.style.position = 'absolute';
+    el.style.width = width + 'px';
+    el.style.height = height + 'px';
+    el.style.left = Math.random() * window.innerWidth + 'px';
+    el.style.top = '-40px';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '999';
+
+    if (spriteUrl.startsWith('http') || spriteUrl.includes('/')) {
+      el.style.backgroundImage = `url('${spriteUrl}')`;
+      el.style.backgroundSize = 'cover';
+    } else {
+      el.innerHTML = spriteUrl;
+      el.style.fontSize = width + 'px';
+    }
+
+    document.body.appendChild(el);
+
+    gsap.to(el, {
+      y: window.innerHeight + 50,
+      x: `+=${Math.random() * 100 - 50}`,
+      rotation: Math.random() * 360,
+      opacity: 0,
+      duration: 2 + Math.random(),
+      ease: 'power1.out',
+      onComplete: () => el.remove()
+    });
+
+    setTimeout(createSprite, 1000 / rate);
+  }
+
+  createSprite();
 }
