@@ -40,28 +40,28 @@
           <img src="images/icon_ad.png"  />
           <div class="reward-label">
             <img src="images/diamond.png" />
-            <span>+415</span>
+            <span>+250</span>
           </div>
         </button>
         <button id="undo-button" class="icon-button" title="Отменить ход">
           <img src="images/icon_undo.png" />
           <div class="reward-label">
             <img src="images/diamond.png"  />
-            <span>110</span>
+            <span>130</span>
           </div>
         </button>
         <button id="destroy-button" class="icon-button" title="Убрать плитку">
           <img src="images/icon_remove.png"  />
           <div class="reward-label">
             <img src="images/diamond.png" />
-            <span>100</span>
+            <span>120</span>
           </div>
         </button>
         <button id="swap-button" class="icon-button" title="Поменять местами">
           <img src="images/icon_swap.png" />
           <div class="reward-label">
             <img src="images/diamond.png" />
-            <span>120</span>
+            <span>150</span>
           </div>
         </button>
         <button id="settings-button" class="icon-button" title="Настройки">
@@ -84,20 +84,40 @@
         <p id="title-game-over-1" class="gradient-text" style="font-size: 6vmin; font-weight: bold; color: white;">Нет доступных ходов</p>
         <p id="title-game-over-2" class="gradient-text" style="font-size: 4.5vmin; font-weight: bold; color: white; line-height: 1.2;">Но ты можешь продолжить!</p>
         
+        <button id="go-undo">
+          <div class="icon-wrapper">
+            <img src="images/icon_undo.png" />
+            <div class="reward-label">
+              <img src="images/diamond.png" />
+              <span class="price">100</span>
+            </div>
+          </div>
+          <span class="title gradient-text">Отменить ход</span>
+        </button>
+
         <button id="go-destroy">
-          <img src="images/icon_remove.png" />
-          <span class="gradient-text">Разбить плитку</span>
+          <div class="icon-wrapper">
+            <img src="images/icon_remove.png" />
+            <div class="reward-label">
+              <img src="images/diamond.png" />
+              <span class="price">100</span>
+            </div>
+          </div>
+          <span class="title gradient-text">Разбить плитку</span>
         </button>
     
         <button id="go-swap">
-          <img src="images/icon_swap.png" />
-          <span class="gradient-text">Поменять местами</span>
+          <div class="icon-wrapper">
+            <img src="images/icon_swap.png" />
+            <div class="reward-label">
+              <img src="images/diamond.png" />
+              <span class="price">100</span>
+            </div>
+          </div>
+          <span class="title gradient-text">Поменять местами</span>
         </button>
     
-        <button id="go-watch-ad">
-          <img src="images/icon_ads.png" />
-          <span class="gradient-text">Посмотреть рекламу</span>
-        </button>
+
     
         <button id="go-restart">
           <img src="images/icon_restart.png" />
@@ -142,7 +162,9 @@
         </button>
         <button id="watch-ad-btn">
           <img src="images/icon_ads.png" >
-          <span class="gradient-text">Вознаграждение</span>
+          <span class="gradient-text">Получить самоцветы</span>
+          <span class="reward-amount">+250</span>
+          <img src="images/diamond.png" style="width: 1.2em;">
         </button>
         <button id="toggle-music-btn">
           <img id="music-icon" src="images/icon_music_on.png" >
@@ -166,6 +188,8 @@
         <button id="no-currency-watch-ad">
           <img src="images/icon_ads.png" />
           <span class="gradient-text">Получить самоцветы</span>
+          <span class="reward-amount">+250</span>
+          <img src="images/diamond.png" style="width: 1.2em;">
         </button>
         <button id="no-currency-close">
           <img src="images/icon_close.png" />

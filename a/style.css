@@ -26,6 +26,19 @@ button, img, canvas, div {
   -webkit-touch-callout: none;
 }
 
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+audio {
+  display: none !important;
+}
+
+::-webkit-media-controls {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -184,6 +197,20 @@ body::-webkit-scrollbar {
   justify-content: center;
   align-items: center;
 }
+
+.grid-container.interactive-cursor .tile {
+  cursor: pointer;
+}
+
+.grid-container.interactive-cursor .tile {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.grid-container.interactive-cursor .tile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(249, 217, 118, 0.6); /* золотистое свечение */
+}
+
 
 .cell::before {
   content: "";
@@ -470,7 +497,7 @@ body::-webkit-scrollbar {
   position: absolute;
   width: 30px;
   height: 30px;
-  background: gold;
+  background: radial-gradient(circle, #f9d976, #f39f86);
   border-radius: 50%;
   box-shadow: 0 0 8px gold;
   pointer-events: none;
@@ -660,15 +687,20 @@ body::-webkit-scrollbar {
   transition: background 0.2s ease;
 }
 
+.icon-wrapper {
+  position: relative;
+}
+
 #go-destroy,
 #go-swap,
-#no-currency-watch-ad {
+#go-undo,
+#no-currency-watch-ad,
+#watch-ad-btn {
   background: radial-gradient(circle at center, #2c7da0,  #014f86);
   animation: pulse 2s infinite;
   /* transform: scale(1.01); */
 }
 
-#go-watch-ad,
 #go-restart {
   font-size: 4.4vmin;
 }
@@ -692,7 +724,7 @@ body::-webkit-scrollbar {
 .settings-cat {
   width: 15vmin;
   height: auto;
-  animation: pulse-cat 2s infinite ease-in-out;
+  
 }
 
 @keyframes pulse-cat {
@@ -727,6 +759,20 @@ body::-webkit-scrollbar {
   width: 2vmin;
   height: 2vmin;
   margin-right: 0.5vmin;
+}
+
+#game-over-overlay .reward-label {
+  bottom: 0.1vmin;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+#game-over-overlay .reward-label img {
+  width: 1.9vmin;
+  height: 1.9vmin;
+}
+
+#game-over-overlay .reward-label span.price {
+  color: rgb(26, 25, 25)
 }
 
 .reward-amount {
@@ -926,4 +972,16 @@ body::-webkit-scrollbar {
   background-size: cover;
   pointer-events: none;
   z-index: 1000;
+}
+
+.pulse-cat {
+  animation: pulse-cat 2s infinite ease-in-out;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.tile-sprite {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
 }

@@ -1,6 +1,7 @@
 let ysdk;
 
 window.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("dragstart", e => e.preventDefault());
 
 const PlayerStatsManager = {
     pendingStats: {},
@@ -15,9 +16,9 @@ const PlayerStatsManager = {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 this.forceSave(); // Принудительно сохраняем, без задержки
-                musicOnPause(true);
+                turnOnPause();
             } else {
-              musicOnPause(false);
+              turnOffPause();
             }
         });
         window.addEventListener('beforeunload', () => {
@@ -125,83 +126,83 @@ const PlayerStatsManager = {
 
 const SoundManager = {
   sounds: {},
-  musicEnabled: true,
-  effectsEnabled: true,
+  audioContext: null,
 
-  load(name, sources, loop = false) {
-    const audio = document.createElement("audio");
-    audio.style.display = "none";
-
-    for (const src of sources) {
-      const type = this.getMimeType(src);
-      if (audio.canPlayType(type)) {
-        audio.src = src;
-        audio.preload = "auto";
-        audio.loop = loop;
-        this.sounds[name] = audio;
-        return;
-      }
+  // Инициализация
+  init() {
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
-
-    console.warn(`⛔ Ни один формат не поддерживается для: ${name}`);
   },
 
-  getMimeType(filename) {
-    if (filename.endsWith(".mp3")) return "audio/mpeg";
-    if (filename.endsWith(".m4a")) return "audio/mp4";
-    if (filename.endsWith(".ogg")) return "audio/ogg";
-    return "";
+  // Загрузка музыки
+  async load(name, url) {
+    this.init();
+    try {
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      
+      this.sounds[name] = {
+        buffer,
+        source: null,
+        startTime: 0,
+        pausedAt: 0
+      };
+    } catch (err) {
+      console.error("Ошибка загрузки:", err);
+    }
   },
 
-  play(name) {
-    if (!this.effectsEnabled) return;
+  // Воспроизведение (с паузой/продолжением)
+  play(name, { loop = false, volume = 1 } = {}) {
     const sound = this.sounds[name];
-    if (sound && !sound.loop) {
-      sound.volume = 0.1;
-      sound.currentTime = 0;
-      sound.play().catch(err => {
-        console.warn(`⛔ Не удалось воспроизвести звук "${name}"`, err);
-      });
+    if (!sound) return;
+
+    // Останавливаем предыдущий источник
+    if (sound.source) {
+      sound.source.stop();
+      sound.source.disconnect();
     }
+
+    // Создаем новый источник
+    sound.source = this.audioContext.createBufferSource();
+    sound.source.buffer = sound.buffer;
+    sound.source.loop = loop;
+
+    // Подключаем громкость
+    const gainNode = this.audioContext.createGain();
+    gainNode.gain.value = volume;
+    sound.source.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    // Запускаем с текущей позиции (0 если первый раз, иначе с pausedAt)
+    sound.source.start(0, sound.pausedAt);
+    sound.startTime = this.audioContext.currentTime - sound.pausedAt;
   },
 
-  playMusic(name) {
-    if (!this.musicEnabled) return;
-    const sound = this.sounds[name];
-    if (sound && sound.loop) {
-      sound.volume = 0.01;
-      sound.play().catch(err => {
-        console.warn(`⛔ Не удалось воспроизвести музыку "${name}"`, err);
-      });
-    }
-  },
-
-  stop(name) {
-    const sound = this.sounds[name];
-    if (sound) {
-      sound.pause();
-      sound.currentTime = 0;
-    }
-  },
-
+  // Пауза (запоминаем позицию)
   pause(name) {
     const sound = this.sounds[name];
-    if (sound) sound.pause();
+    if (!sound?.source) return;
+
+    sound.pausedAt = this.audioContext.currentTime - sound.startTime;
+    sound.source.stop();
+    sound.source.disconnect();
+    sound.source = null;
   },
 
-  toggleMusic(enable) {
-    this.musicEnabled = enable;
-    if (!enable) this.pause("bg");
-  },
+  // Полная остановка (сброс позиции)
+  stop(name) {
+    const sound = this.sounds[name];
+    if (!sound) return;
 
-  toggleSound(enable) {
-    this.effectsEnabled = enable;
-    if (!enable) {
-      for (const s of Object.values(this.sounds)) {
-        s.pause();
-        s.currentTime = 0;
-      }
+    if (sound.source) {
+      sound.source.stop();
+      sound.source.disconnect();
+      sound.source = null;
     }
+    sound.pausedAt = 0;
   }
 };
 
@@ -230,11 +231,14 @@ const game = {
     destroyPanel: document.getElementById("destroy-mode-panel"),
     swapPanel: document.getElementById("swap-mode-panel"),
 
+    gameOverOverlay: document.getElementById("game-over-overlay"),
+
     selectedTiles: [],
 
     historyStack: [],
     HISTORY_LIMIT: 10,
 
+    soundPermitted: false,
     isMusicOn: false,
     musicReady: false,
     musicStarted: false,
@@ -244,8 +248,9 @@ const game = {
     destroyMode: false,
 
     isPlaying: false,
-    isPaused: false,
+    isOverlay: false,
     isMove: false,
+    isPaused: false,
 
     hasEnteredBefore: false,
     currency: 0,
@@ -280,6 +285,7 @@ const game = {
     currencyStart: 100,
 
     intervalSmartAd: 3 * 60 * 1000,
+    displayOfAds: false
 
 };
 
@@ -391,16 +397,12 @@ function initGame(callback) {
           }
         }
 
-        SoundManager.load("bg", ["sound/music.mp3"], true);
+        SoundManager.load("bg", ["sound/music.mp3"]);
         SoundManager.load("destroy", ["sound/destroy.mp3"]);
         SoundManager.load("swap", ["sound/swap.mp3"]);
         SoundManager.load("undo", ["sound/undo.mp3"]);
         SoundManager.load("levelUp", ["sound/levelUp.mp3"]);
         SoundManager.load("succes", ["sound/succes.mp3"]);
-        
-        SoundManager.sounds["bg"].addEventListener("canplaythrough", () => {
-          game.musicReady = true;
-        });
         
         startGame();
         setupInput();
@@ -426,10 +428,10 @@ function initGame(callback) {
         document.getElementById("close-settings-btn").addEventListener("click", closeSettingsOverlay);
 
         // Навешиваем на первое взаимодействие
-        document.addEventListener("click", tryStartMusic);
-        window.addEventListener("touchstart", tryStartMusic);
-        window.addEventListener("keydown", tryStartMusic);
-        document.body.addEventListener('click', tryStartMusic, { once: true });
+        document.addEventListener("click", allowMusic);
+        window.addEventListener("touchstart", allowMusic);
+        window.addEventListener("keydown", allowMusic);
+        document.body.addEventListener('click', allowMusic, { once: true });
 
 
         document.getElementById('display-mode').addEventListener('change', (e) => {
@@ -439,6 +441,85 @@ function initGame(callback) {
         });
 
 
+        //---
+        document.getElementById("go-destroy").onclick = () => {
+          hiddenGameOverOverlay();
+          enterDestroyMode();
+        };
+      
+        document.getElementById("go-swap").onclick = () => {
+          hiddenGameOverOverlay();
+          enterSwapMode();
+        };
+      
+        document.getElementById("go-undo").onclick = () => {
+          hiddenGameOverOverlay();
+          undoMove();
+        };
+      
+        document.getElementById("go-restart").onclick = () => {
+          hiddenGameOverOverlay();
+          restartGame();
+        };
+        //---
+
+
+        document.querySelectorAll(".settings-cat").forEach(cat => {
+          cat.classList.add("clickable");
+          cat.classList.add("pulse-cat");
+        
+          cat.addEventListener("click", () => {
+            // Убираем pulse-cat временно (если есть)
+            cat.classList.remove("pulse-cat");
+        
+            // Клонируем элемент (внутренне), чтобы не сбивалась анимация
+            gsap.timeline()
+              .to(cat, { scale: 0.9, duration: 0.05 })
+              .to(cat, { rotation: gsap.utils.random(-15, 15), duration: 0.08, ease: "power1.inOut" })
+              .to(cat, { rotation: 0, duration: 0.1 })
+              .to(cat, { scale: 1, duration: 0.1 });
+        
+            // Партиклы
+            const rect = cat.getBoundingClientRect();
+            for (let i = 0; i < 10; i++) {
+              const p = document.createElement("div");
+              p.className = "particle";
+              document.body.appendChild(p);
+        
+              p.style.left = rect.left + rect.width / 2 + "px";
+              p.style.top = rect.top + rect.height / 2 + "px";
+        
+              const angle = Math.random() * Math.PI * 2;
+              const dist = 50 + Math.random() * 30;
+              const dx = Math.cos(angle) * dist;
+              const dy = Math.sin(angle) * dist;
+        
+              gsap.to(p, {
+                x: dx,
+                y: dy,
+                scale: 0.5 + Math.random(),
+                opacity: 0,
+                duration: 0.6,
+                ease: "power2.out",
+                onComplete: () => p.remove()
+              });
+            }
+        
+            // Вернём pulse чуть позже, если хочешь
+            setTimeout(() => {
+              // cat.classList.remove("pulse-cat");
+              // void cat.offsetWidth;
+              cat.classList.add("pulse-cat");
+            }, 800);
+
+          });
+        });
+        
+
+        document.querySelectorAll("img").forEach(el => {
+          el.setAttribute("draggable", "false");
+        });
+        
         game.lastClaimDate = new Date();
 
         if (callback) callback();
@@ -455,7 +536,7 @@ function closeSettingsOverlay() {
         ease: "back.in(1.7)",
         onComplete: () => {
             game.settingsOverlay.classList.add("hidden");
-            game.isPaused = false;
+            game.isOverlay = false;
         }
     });
 }
@@ -560,7 +641,7 @@ function initDefaultSettings() {
     game.playDays = 0;
     game.historyStack = [];
     game.isPlaying = false;
-    game.isPaused = false;
+    game.isOverlay = false;
     game.isMusicOn = false;
     game.musicReady = false;
     game.musicStarted = false;
@@ -824,33 +905,13 @@ function checkGameOver() {
 }
 
 function showGameOverOverlay() {
-  const overlay = document.getElementById("game-over-overlay");
-  overlay.classList.remove("hidden");
-  game.isPaused = true;
+  game.gameOverOverlay.classList.remove("hidden");
+  game.isOverlay = true;
+}
 
-  document.getElementById("go-destroy").onclick = () => {
-    overlay.classList.add("hidden");
-    game.isPaused = false;
-    enterDestroyMode();
-  };
-
-  document.getElementById("go-swap").onclick = () => {
-    overlay.classList.add("hidden");
-    game.isPaused = false;
-    enterSwapMode();
-  };
-
-  document.getElementById("go-watch-ad").onclick = () => {
-    overlay.classList.add("hidden");
-    game.isPaused = false;
-    showAdsVideo("game");
-  };
-
-  document.getElementById("go-restart").onclick = () => {
-    overlay.classList.add("hidden");
-    game.isPaused = false;
-    restartGame();
-  };
+function hiddenGameOverOverlay() {
+  game.gameOverOverlay.classList.add("hidden");
+  game.isOverlay = false;
 }
 
 
@@ -894,7 +955,7 @@ function checkWin(cell, paramWin) {
     
     if (level > 3) {
       if (paramWin.sound) {
-        SoundManager.play("levelUp");
+        playSound("levelUp");
         paramWin.sound = false;
       }
     }
@@ -1137,7 +1198,9 @@ function addScore(points) {
 
 function setupInput() {
     window.addEventListener("keydown", (e) => {
-      if (!(game.isPaused || game.destroyMode || game.swapMode) && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      if (game.isOverlay || game.destroyMode || game.swapMode || game.isPaused) return;
+
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
         e.preventDefault();
         move(e.key);
       }
@@ -1155,7 +1218,7 @@ function setupInput() {
       const t = e.changedTouches[0];
       const dx = t.clientX - touchStartX;
       const dy = t.clientY - touchStartY;
-      if (!(game.isPaused || game.destroyMode || game.swapMode)) {
+      if (!(game.isOverlay || game.destroyMode || game.swapMode || game.isPaused)) {
         if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipeDistance) {
           move(dx > 0 ? "ArrowRight" : "ArrowLeft");
         } else if (Math.abs(dy) > minSwipeDistance) {
@@ -1172,42 +1235,17 @@ function setupInput() {
 
 }
 
-function tryStartMusic() {
-  if (game.musicStarted || !game.isMusicOn) return;
-
-  const music = SoundManager.sounds["bg"];
-
-  if (!music) return;
-
-  // если не инициализировано — загрузим (один раз)
-  if (!music.dataset?.initialized) {
-    music.dataset = music.dataset || {};
-    music.dataset.initialized = true;
-    music.load();
-    return;
+function allowMusic() {
+  if (!game.soundPermitted) {
+    SoundManager.init(); // Разрешаем звук
   }
-
-  // попытка воспроизведения
-  music.volume = 0.01;
-  music.loop = true;
-
-  music.play().then(() => {
-    console.log("🎵 Музыка играет!");
-    game.musicStarted = true;
-  }).catch(err => {
-    console.warn("⚠️ Ошибка запуска музыки:", err);
-  });
+  game.soundPermitted = true;
+  playMusic();
 
   // Удалим слушатели после первой попытки
-  document.removeEventListener("click", tryStartMusic);
-  window.removeEventListener("touchstart", tryStartMusic);
-  window.removeEventListener("keydown", tryStartMusic);
-}
-
-function tryStartSound() {
-  if (!game.isSoundOn) return;
-
-  SoundManager.play("succes");
+  document.removeEventListener("click", allowMusic);
+  window.removeEventListener("touchstart", allowMusic);
+  window.removeEventListener("keydown", allowMusic);
 
 }
 
@@ -1232,10 +1270,8 @@ function pushToHistory(snapshot) {
 
 function undoMove() {
     if (game.destroyMode || game.swapMode) return;
-  
-    const cost = game.undoPrice;
 
-    if (game.currency < cost) {
+    if (game.currency < game.undoPrice) {
       showNoCurrencyOverlay();
       return;
     }
@@ -1243,9 +1279,9 @@ function undoMove() {
     const prev = game.historyStack.pop();
     if (!prev) return;
   
-    SoundManager.play("undo");
+    playSound("undo");
 
-    game.currency -= cost;
+    game.currency -= game.undoPrice;
   
     game.score = prev.score;
     game.highestLevelReached = prev.highestLevelReached;
@@ -1254,36 +1290,80 @@ function undoMove() {
     updateBestScoreDisplay();
     updateCurrencyDisplay();
   
-    game.gridElement.innerHTML = "";
-    game.grid = [];
-    createGrid();
+    // game.gridElement.innerHTML = "";
+    // game.grid = [];
+    // createGrid();
   
+    // for (let r = 0; r < game.gridSize; r++) {
+    //   for (let c = 0; c < game.gridSize; c++) {
+    //     const cell = prev.grid[r][c];
+    //     if (cell) {
+    //       const tile = document.createElement("div");
+    //       tile.className = "tile";
+    //       tile.innerHTML = `
+    //         <div class="tile-inner">
+    //           <div class="tile-sprite"></div>
+    //           <div class="tile-level"></div>
+    //         </div>`;
+    //       tile.dataset.value = cell.value;
+    //       tile.dataset.level = getLevel(cell.value);
+
+    //       updateFontSize(tile, cell.value);
+
+    //       game.grid[r][c] = { el: tile, value: cell.value };
+    //       setTilePosition(tile, r, c);
+    //       styleTile(tile, cell.value);
+    //       setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
+    //       // game.gridElement.appendChild(tile);
+
+    //     }
+    //   }
+    // }
+
     for (let r = 0; r < game.gridSize; r++) {
       for (let c = 0; c < game.gridSize; c++) {
-        const cell = prev.grid[r][c];
-        if (cell) {
-          const tile = document.createElement("div");
-          tile.className = "tile";
-          tile.innerHTML = `
-            <div class="tile-inner">
-              <div class="tile-sprite"></div>
-              <div class="tile-level"></div>
-            </div>`;
-          tile.dataset.value = cell.value;
-          tile.dataset.level = getLevel(cell.value);
-
-          updateFontSize(tile, cell.value);
-
-          game.grid[r][c] = { el: tile, value: cell.value };
-          setTilePosition(tile, r, c);
-          styleTile(tile, cell.value);
-          setTileSprite(tile.querySelector('.tile-sprite'), cell.value);
-          // game.gridElement.appendChild(tile);
-
+        const prevCell = prev.grid[r][c];
+        const current = game.grid[r][c];
+    
+        if (prevCell) {
+          if (!current) {
+            // создать новую плитку
+            const tile = document.createElement("div");
+            tile.className = "tile";
+            tile.innerHTML = `
+              <div class="tile-inner">
+                <div class="tile-sprite"></div>
+                <div class="tile-level"></div>
+              </div>`;
+            tile.dataset.value = prevCell.value;
+            tile.dataset.level = getLevel(prevCell.value);
+            updateFontSize(tile, prevCell.value);
+            styleTile(tile, prevCell.value);
+            setTileSprite(tile.querySelector('.tile-sprite'), prevCell.value);
+            setTilePosition(tile, r, c);
+    
+            const cell = getCellElement(r, c);
+            cell.appendChild(tile);
+            game.grid[r][c] = { el: tile, value: prevCell.value };
+          } else {
+            // обновить существующую плитку
+            current.el.dataset.value = prevCell.value;
+            current.el.dataset.level = getLevel(prevCell.value);
+            updateFontSize(current.el, prevCell.value);
+            styleTile(current.el, prevCell.value);
+            setTileSprite(current.el.querySelector('.tile-sprite'), prevCell.value);
+            setTilePosition(current.el, r, c);
+            current.value = prevCell.value;
+          }
+        } else if (current) {
+          // удалить текущую, если её не было в prev
+          current.el.remove();
+          game.grid[r][c] = null;
         }
       }
     }
 
+    
     PlayerStatsManager.prepareChanges();
 }
 
@@ -1297,14 +1377,14 @@ function enterDestroyMode() {
     return;
   }
 
-  const cost = game.destroyPrice;
-
-  if (game.currency < cost) {
+  if (game.currency < game.destroyPrice) {
     showNoCurrencyOverlay();
     return;
   }
   
   game.destroyMode = true;
+  updateTileCursorState();
+
   updateHelperPanel("destroy-mode-panel");
   game.destroyPanel.classList.remove("hidden");
 
@@ -1352,8 +1432,7 @@ function handleDestroyClick(e) {
       return;
     }
   
-    const cost = 100;
-    game.currency -= cost;
+    game.currency -= game.destroyPrice;
     // Storage.save("currency", currency);
     updateCurrencyDisplay();
   
@@ -1379,7 +1458,7 @@ function handleDestroyClick(e) {
     const centerX = tileRect.top + tileRect.width / 2;
     const centerY = tileRect.left + tileRect.height / 2;
   
-    SoundManager.play("destroy");
+    playSound("destroy");
 
     // Частицы
     for (let i = 0; i < 15; i++) {
@@ -1442,6 +1521,8 @@ function handleDestroyClick(e) {
 
 function exitDestroyMode() {
     game.destroyMode = false;
+    updateTileCursorState();
+    
     game.destroyPanel.classList.add("hidden");
     document.removeEventListener("click", handleDestroyClick);
 }
@@ -1468,15 +1549,15 @@ function enterSwapMode() {
     exitSwapMode();
     return;
   }
-
-  const cost = game.swapPrice;
   
-  if (game.currency < cost) {
+  if (game.currency < game.swapPrice) {
     showNoCurrencyOverlay();
     return;
   }
 
   game.swapMode = true;
+  updateTileCursorState();
+
   updateHelperPanel("swap-mode-panel");
   game.selectedTiles = [];
   game.swapPanel.classList.remove("hidden");
@@ -1487,7 +1568,7 @@ function enterSwapMode() {
 }
 
 function openSettings() {
-    game.isPaused = true;
+    game.isOverlay = true;
     const randomHelper = Math.floor(Math.random() * 8) + 1;
     const img = game.settingsOverlay.querySelector(".settings-cat");
     const path = `images/helper_${randomHelper}.png`;
@@ -1505,6 +1586,8 @@ function openSettings() {
 
 function exitSwapMode() {
     game.swapMode = false;
+    updateTileCursorState();
+
     game.swapPanel.classList.add("hidden");
     document.removeEventListener("click", handleSwapClick);
   
@@ -1534,8 +1617,7 @@ function handleSwapClick(e) {
   
     if (game.selectedTiles.length === 2) {
   
-        const cost = 120;
-        game.currency -= cost;
+        game.currency -= game.swapPrice;
         updateCurrencyDisplay();
 
         pushToHistory(getSnapshotBoard());
@@ -1565,7 +1647,7 @@ function handleSwapClick(e) {
         // const posA = { x: first.c * game.cellSize + game.gap, y: first.r * game.cellSize + game.gap };
         // const posB = { x: second.c * game.cellSize + game.gap, y: second.r * game.cellSize + game.gap };
 
-        SoundManager.play("swap");
+        playSound("swap");
 
 
         // gsap.to(elA, {
@@ -1602,13 +1684,18 @@ function showAdsVideo(source = "game") {
     closeSettingsOverlay();
   }
 
+  turnOnPause();
+
   ysdk.adv.showRewardedVideo({
     callbacks: {
         onOpen: () => {
+          game.displayOfAds = true;
           console.log('Video ad open.');
-          musicOnPause(true);
+          
         },
         onRewarded: () => {
+
+          game.lastAdTimestamp = Date.now();
 
           game.currency += rewardAmount;
 
@@ -1622,11 +1709,9 @@ function showAdsVideo(source = "game") {
           console.log('Rewarded!');
         },
         onClose: () => {
+          game.displayOfAds = false;
           console.log('Video ad closed.');
-          musicOnPause(false);
-          setTimeout(() => {
-            // syncTileSizeWithCell();
-          }, 150);
+          turnOffPause();
         },
         onError: (e) => {
           console.log('Error while open video ad:', e);
@@ -1659,9 +1744,9 @@ function updateLangTexts() {
   document.getElementById("toggle-sound-btn").querySelector('span').textContent = t("sound");
   document.getElementById("close-settings-btn").querySelector('span').textContent = t("continue");
   
-  document.getElementById("go-destroy").querySelector('span').textContent = t("destroy");
-  document.getElementById("go-swap").querySelector('span').textContent = t("swap");
-  document.getElementById("go-watch-ad").querySelector('span').textContent = t("getGems");
+  document.getElementById("go-destroy").querySelector('span.title').textContent = t("destroy");
+  document.getElementById("go-swap").querySelector('span.title').textContent = t("swap");
+  document.getElementById("go-undo").querySelector('span.title').textContent = t("undo");
   document.getElementById("go-restart").querySelector('span').textContent = t("newGame");
 
   document.getElementById("title-game-over-1").textContent = t("title-game-over-1");
@@ -1685,6 +1770,10 @@ function updateLangTexts() {
   document.getElementById("destroy-button").querySelector('span').textContent = game.destroyPrice;
   document.getElementById("swap-button").querySelector('span').textContent = game.swapPrice;
 
+  document.getElementById("go-undo").querySelector('span.price').textContent = game.undoPrice;
+  document.getElementById("go-destroy").querySelector('span.price').textContent = game.destroyPrice;
+  document.getElementById("go-swap").querySelector('span.price').textContent = game.swapPrice;
+
 }
 
 function restartGame() {
@@ -1703,7 +1792,7 @@ function restartGame() {
         spawnTile();
         PlayerStatsManager.prepareChanges();
         game.lastClaimDate = new Date();
-        game.isPaused = false;
+        game.isOverlay = false;
         game.isPlaying = true;
     }, 500);
 
@@ -1724,13 +1813,8 @@ function toggleMusic() {
     
     updateLabelMusic();
   
-    SoundManager.toggleMusic(game.isMusicOn);
-    if (game.isMusicOn) {
-      tryStartMusic();
-    } else {
-      SoundManager.pause("bg");
-      game.musicStarted = false;
-    }
+    game.isMusicOn ? playMusic() : stopMusic();
+    
 }
 
 function toggleSound() {
@@ -1741,10 +1825,6 @@ function toggleSound() {
   
   updateLabelSound();
 
-  SoundManager.toggleSound(game.isSoundOn);
-  if (game.isSoundOn) {
-    tryStartSound();
-  }
 }
 
 function updateLabelMusic() {
@@ -1816,6 +1896,9 @@ function showRewardPopup(message, callback) {
 }
 
 function tryShowSmartAd(trigger = "auto") {
+
+  if (game.displayOfAds) return;
+
   const now = Date.now();
 
   const deltaTime = now - game.lastAdTimestamp;
@@ -1832,7 +1915,7 @@ function tryShowSmartAd(trigger = "auto") {
   if (isAuto) {
     if (deltaTime < game.intervalSmartAd) return;
     if (game.destroyMode || game.swapMode) return;
-    if (game.isAuthorized && game.playDays < 5) {
+    if (game.playDays < 5 && (game.isAuthorized || game.playDays > 1)) {
       if (game.playDays === 4 && (deltaTime < game.intervalSmartAd + 60_000)) return;
       if (game.playDays === 3 && (deltaTime < game.intervalSmartAd + 120_000)) return;
       if (game.playDays === 2 && (deltaTime < game.intervalSmartAd + 180_000)) return;
@@ -1851,19 +1934,22 @@ function tryShowSmartAd(trigger = "auto") {
 }
 
 function showFullscreenAd(callbackAfterAd = null) {
-  if (!ysdk?.adv) return;
+  if (!ysdk?.adv || game.displayOfAds) return;
+
+  turnOnPause();
 
   ysdk.adv.showFullscreenAdv({
     callbacks: {
       onOpen: () => {
+        game.displayOfAds = true;
         console.log("📺 Реклама открыта");
-        musicOnPause(true);
       },
       onClose: (wasShown) => {
+        game.displayOfAds = false;
+        turnOffPause();
         console.log("📺 Закрыта. Показана:", wasShown);
         if (wasShown) {
           game.lastAdTimestamp = Date.now();
-          musicOnPause(false);
         }
         if (callbackAfterAd) callbackAfterAd?.();
       },
@@ -1896,11 +1982,11 @@ function showNoCurrencyOverlay() {
   );
 
   overlay.classList.remove("hidden");
-  game.isPaused = true;
+  game.isOverlay = true;
 
   document.getElementById("no-currency-close").onclick = () => {
     overlay.classList.add("hidden");
-    game.isPaused = false;
+    game.isOverlay = false;
   };
 
   document.getElementById("no-currency-watch-ad").onclick = () => {
@@ -1909,15 +1995,33 @@ function showNoCurrencyOverlay() {
   };
 }
 
-function musicOnPause(isActive = true) {
-  if (!game.isMusicOn || !game.musicReady) return;
-  if (isActive) {
-    SoundManager.pause("bg");
-    game.musicStarted = false;
-  } else {
-    tryStartMusic();
-  }
-  
+function turnOnPause() {
+  game.isPaused = true;
+  pauseMusic();
+}
+
+function turnOffPause() {
+  game.isPaused = false;
+  playMusic();
+}
+
+// ▶️ Запуск/продолжение
+function playMusic() {
+  if (game.soundPermitted && game.isMusicOn) SoundManager.play("bg", { loop: true, volume: 0.1 });
+}
+
+function playSound(name) {
+  if (game.soundPermitted && game.isSoundOn) SoundManager.play(name);
+}
+
+// ⏸ Пауза
+function pauseMusic() {
+  SoundManager.pause("bg");
+}
+
+// ⏹ Остановка (сброс на начало)
+function stopMusic() {
+  SoundManager.stop("bg");
 }
 
 
@@ -2136,4 +2240,12 @@ function burstSprites({
   }
 
   createSprite();
+}
+
+function updateTileCursorState() {
+  if (game.destroyMode || game.swapMode) {
+    game.gridElement.classList.add('interactive-cursor');
+  } else {
+    game.gridElement.classList.remove('interactive-cursor');
+  }
 }
